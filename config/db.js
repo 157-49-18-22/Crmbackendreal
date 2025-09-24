@@ -1,16 +1,18 @@
-import mysql from 'mysql2/promise';
+import pkg from 'pg';
 import dotenv from 'dotenv';
 
+const { Pool } = pkg;
 dotenv.config();
 
-const pool = mysql.createPool({
+const pool = new Pool({
   host: process.env.DB_HOST || 'localhost',
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || 'your_mysql_password',
+  user: process.env.DB_USER || 'postgres',
+  password: process.env.DB_PASSWORD || 'your_postgres_password',
   database: process.env.DB_NAME || 'crm',
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0
+  port: process.env.DB_PORT || 5432,
+  ssl: {
+    rejectUnauthorized: false
+  }
 });
 
 export default pool; 
