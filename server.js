@@ -39,14 +39,14 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Test database connection
-pool.getConnection()
-  .then(connection => {
-    console.log('Connected to MySQL Database');
-    connection.release();
+pool.query('SELECT NOW()')
+  .then(result => {
+    console.log('Connected to PostgreSQL Database');
+    console.log('Database time:', result.rows[0].now);
   })
   .catch(err => {
-    console.error('MySQL connection error:', err);
-    console.log('Please make sure MySQL is running and database exists');
+    console.error('PostgreSQL connection error:', err);
+    console.log('Please make sure PostgreSQL is running and database exists');
   });
 
 // Routes
