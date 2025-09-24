@@ -53,18 +53,18 @@ router.post('/register', [
     const hashedPassword = await bcrypt.hash(password, salt);
 
     // Create new user
-    const [result] = await pool.execute(
-      'INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)',
+    const result = await pool.query(
+      'INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, $4) RETURNING id',
       [name, email, hashedPassword, role]
     );
 
     // Get the created user
-    const [users] = await pool.execute(
-      'SELECT id, name, email, role, avatar, isActive, createdAt FROM users WHERE id = ?',
-      [result.insertId]
+    const users = await pool.query(
+      'SELECT id, name, email, role, avatar, isActive, createdAt FROM users WHERE id = $1',
+      [result.rows[0].id]
     );
 
-    const user = users[0];
+    const user = users.rows[0];
 
     // Generate token
     const token = generateToken(user.id);
@@ -97,18 +97,18 @@ router.post('/login', [
     const { email, password } = req.body;
 
     // Check if user exists
-    const [users] = await pool.execute(
-      'SELECT * FROM users WHERE email = ?',
+    const users = await pool.query(
+      'SELECT * FROM users WHERE email = $1',
       [email]
     );
-    console.log('User lookup result:', users);
+    console.log('User lookup result:', users.rows);
 
-    if (users.length === 0) {
+    if (users.rows.length === 0) {
       console.log('Invalid credentials: user not found');
       return res.status(400).json({ message: 'Invalid credentials' });
     }
 
-    const user = users[0];
+    const user = users.rows[0];
 
     // Check password
     const isMatch = await bcrypt.compare(password, user.password);
