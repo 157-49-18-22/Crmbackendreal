@@ -94,11 +94,11 @@ router.get('/assignable-users', auth, async (req, res) => {
     
     if (req.user.role === 'admin') {
       // Admin can assign to managers and employees except themselves
-      query += ' AND role IN ("manager", "employee") AND id != $1';
+      query += ' AND role IN (\'manager\', \'employee\') AND id != $1';
       params.push(req.user.id);
     } else if (req.user.role === 'manager') {
       // Manager can assign to employees only
-      query += ' AND role = "employee" AND id != $1';
+      query += ' AND role = \'employee\' AND id != $1';
       params.push(req.user.id);
     } else {
       // Employees cannot assign tasks
