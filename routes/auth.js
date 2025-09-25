@@ -150,7 +150,7 @@ router.post('/login', [
     
     res.status(500).json({ 
       message: 'Server error', 
-      error: process.env.NODE_ENV === 'development' $1 error.message : 'Internal server error'
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
   }
 });
@@ -160,7 +160,7 @@ router.post('/login', [
 // @access  Private
 router.post('/refresh', async (req, res) => {
   try {
-    const token = req.header('Authorization')$1.replace('Bearer ', '');
+    const token = req.header('Authorization').replace('Bearer ', '');
     
     if (!token) {
       return res.status(401).json({ message: 'No token provided' });
@@ -197,7 +197,7 @@ router.post('/refresh', async (req, res) => {
 // @access  Private
 router.get('/me', async (req, res) => {
   try {
-    const token = req.header('Authorization')$1.replace('Bearer ', '');
+    const token = req.header('Authorization').replace('Bearer ', '');
     
     if (!token) {
       return res.status(401).json({ message: 'No token, authorization denied' });
@@ -234,7 +234,7 @@ router.put('/profile', [
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const token = req.header('Authorization')$1.replace('Bearer ', '');
+    const token = req.header('Authorization').replace('Bearer ', '');
     if (!token) {
       return res.status(401).json({ message: 'No token, authorization denied' });
     }
@@ -244,7 +244,7 @@ router.put('/profile', [
 
     // Check if email is already taken by another user
     const existingUsers = await pool.query(
-      'SELECT id FROM users WHERE email = $1 AND id != $1',
+      'SELECT id FROM users WHERE email = . AND id != .',
       [email, decoded.userId]
     );
 
@@ -254,7 +254,7 @@ router.put('/profile', [
 
     // Update user
     await pool.query(
-      'UPDATE users SET name = $1, email = $1, avatar = $1 WHERE id = $1',
+      'UPDATE users SET name = ., email = ., avatar = . WHERE id = .',
       [name, email, avatar || '', decoded.userId]
     );
 
