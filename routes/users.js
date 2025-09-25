@@ -23,7 +23,7 @@ router.get('/', adminAuth, async (req, res) => {
 router.get('/employees', adminAuth, async (req, res) => {
   try {
     const employees = await pool.query(
-      'SELECT id, name, email, role, avatar, isActive, createdAt FROM users WHERE role IN ($1, $2) ORDER BY createdAt DESC',
+      'SELECT id, name, email, role, avatar, isActive, createdAt FROM users WHERE role IN (?, $2) ORDER BY createdAt DESC',
       ['employee', 'manager']
     );
     res.json(employees.rows);
@@ -50,7 +50,7 @@ router.post('/employees', adminAuth, [
 
     // Check if user already exists
     const existingUsers = await pool.query(
-      'SELECT id FROM users WHERE email = $1',
+      'SELECT id FROM users WHERE email = ?',
       [email]
     );
 
@@ -64,13 +64,13 @@ router.post('/employees', adminAuth, [
 
     // Create new user with specified role
     const result = await pool.query(
-      'INSERT INTO users (name, email, password, role) VALUES ($1, $1, $1, $1)',
+      'INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)',
       [name, email, hashedPassword, role]
     );
 
     // Get the created user
     const users = await pool.query(
-      'SELECT id, name, email, role, avatar, isActive, createdAt FROM users WHERE id = $1',
+      'SELECT id, name, email, role, avatar, isActive, createdAt FROM users WHERE id = ?',
       [result.insertId]
     );
 
@@ -88,7 +88,7 @@ router.post('/employees', adminAuth, [
 router.get('/:id', auth, async (req, res) => {
   try {
     const users = await pool.query(
-      'SELECT id, name, email, role, avatar, isActive, createdAt FROM users WHERE id = $1',
+      'SELECT id, name, email, role, avatar, isActive, createdAt FROM users WHERE id = ?',
       [req.params.id]
     );
     if (users.rows.length === 0) {
@@ -120,26 +120,26 @@ router.put('/:id', auth, [
       return res.status(403).json({ message: 'Access denied' });
     }
     const { name, email, role, isActive } = req.body;
-    const updates = ['name = $1', 'email = $1'];
+    const updates = ['name = ?', 'email = ?'];
     const params = [name, email];
     // Only admins can update role and isActive
     if (req.user.role === 'admin') {
       if (role) {
-        updates.push('role = $1');
+        updates.push('role = ?');
         params.push(role);
       }
       if (typeof isActive === 'boolean') {
-        updates.push('isActive = $1');
+        updates.push('isActive = ?');
         params.push(isActive);
       }
     }
     params.push(req.params.id);
     await pool.query(
-      `UPDATE users SET ${updates.join(', ')} WHERE id = $1`,
+      `UPDATE users SET ${updates.join(', ')} WHERE id = ?`,
       params
     );
     const users = await pool.query(
-      'SELECT id, name, email, role, avatar, isActive, createdAt FROM users WHERE id = $1',
+      'SELECT id, name, email, role, avatar, isActive, createdAt FROM users WHERE id = ?',
       [req.params.id]
     );
     if (users.rows.length === 0) {
@@ -156,7 +156,7 @@ router.put('/:id', auth, [
 router.delete('/:id', adminAuth, async (req, res) => {
   try {
     const users = await pool.query(
-      'SELECT id FROM users WHERE id = $1',
+      'SELECT id FROM users WHERE id = ?',
       [req.params.id]
     );
     if (users.rows.length === 0) {
@@ -167,7 +167,7 @@ router.delete('/:id', adminAuth, async (req, res) => {
       return res.status(400).json({ message: 'Cannot delete your own account' });
     }
     await pool.query(
-      'DELETE FROM users WHERE id = $1',
+      'DELETE FROM users WHERE id = ?',
       [req.params.id]
     );
     res.json({ message: 'User removed' });
