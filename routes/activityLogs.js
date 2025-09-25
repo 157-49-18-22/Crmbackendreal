@@ -101,7 +101,7 @@ router.get('/', auth, async (req, res) => {
     
     // Add leadId filter if provided
     if (leadId) {
-      query += ` WHERE al.object_id = ?`;
+      query += ` WHERE al.object_id = $1`;
       params.push(leadId);
     }
     
@@ -162,12 +162,12 @@ router.post('/', async (req, res) => {
     eventDescription = eventDescription || 'Lead activity';
 
     // Use default user ID if not authenticated (for testing)
-    const userId = req.user?.id || 1;
+    const userId = req.user$1.id || 1;
 
     const query = `
       INSERT INTO activity_logs 
       (user_id, object_type, object_id, object_name, event_type, event_description, value_before, value_after, impact, priority)
-       VALUES (?, $2, $3, $4, $5, $6, $7, $8, $9, ?0)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
     `;
 
     const params = [
@@ -236,7 +236,7 @@ router.get('/:id', auth, async (req, res) => {
         al.priority
       FROM activity_logs al
       LEFT JOIN users u ON al.user_id = u.id
-      WHERE al.id = ?
+      WHERE al.id = $1
     `;
 
     const activities = await pool.query(query, [id]);
@@ -267,7 +267,7 @@ router.delete('/:id', auth, async (req, res) => {
       return res.status(403).json({ message: 'Access denied. Admin only.' });
     }
 
-    const result = await pool.query('DELETE FROM activity_logs WHERE id = ?', [id]);
+    const result = await pool.query('DELETE FROM activity_logs WHERE id = $1', [id]);
 
      if (result.rowCount === 0) {
       return res.status(404).json({ message: 'Activity log not found' });
