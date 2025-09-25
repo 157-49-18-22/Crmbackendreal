@@ -9,10 +9,10 @@ const router = express.Router();
 // GET /api/leads/public - Get all leads without authentication (for WhatsApp bot)
 router.get('/public', async (req, res) => {
   try {
-    const [leads] = await pool.query(
+    const leads = await pool.query(
       `SELECT * FROM leads ORDER BY createdAt DESC`
     );
-    res.json(leads);
+    res.json(leads.rows);
   } catch (error) {
     console.error('Get public leads error:', error);
     res.status(500).json({ message: 'Server error' });
@@ -46,17 +46,17 @@ router.get('/all', auth, async (req, res) => {
       params.push(`%${search}%`, `%${search}%`, `%${search}%`);
     }
     
-    const [leads] = await pool.query(
+    const leads = await pool.query(
       `SELECT * FROM leads ${where} ORDER BY createdAt DESC LIMIT ${limitNum} OFFSET ${offsetNum}`,
       params
     );
-    const [countRows] = await pool.query(
+    const countRows = await pool.query(
       `SELECT COUNT(*) as total FROM leads ${where}`,
       params
     );
-    const total = countRows[0].total;
+    const total = countRows.rows[0].total;
     res.json({
-      leads,
+      leads: leads.rows,
       totalPages: Math.ceil(total / limitNum),
       currentPage: pageNum,
       total
@@ -92,17 +92,17 @@ router.get('/', auth, async (req, res) => {
       where += ' AND (name LIKE ? OR contact_name LIKE ? OR company_name LIKE ?)';
       params.push(`%${search}%`, `%${search}%`, `%${search}%`);
     }
-    const [leads] = await pool.query(
+    const leads = await pool.query(
       `SELECT * FROM leads ${where} ORDER BY createdAt DESC LIMIT ${limitNum} OFFSET ${offsetNum}`,
       params
     );
-    const [countRows] = await pool.query(
+    const countRows = await pool.query(
       `SELECT COUNT(*) as total FROM leads ${where}`,
       params
     );
-    const total = countRows[0].total;
+    const total = countRows.rows[0].total;
     res.json({
-      leads,
+      leads: leads.rows,
       totalPages: Math.ceil(total / limitNum),
       currentPage: pageNum,
       total
@@ -116,23 +116,23 @@ router.get('/', auth, async (req, res) => {
 // GET /api/leads/:id - Get lead by ID
 router.get('/:id', auth, async (req, res) => {
   try {
-    const [leads] = await pool.query(
+    const leads = await pool.query(
       `SELECT * FROM leads WHERE id = ?`,
       [req.params.id]
     );
-    if (leads.length === 0) {
+    if (leads.rows.length === 0) {
       return res.status(404).json({ message: 'Lead not found' });
     }
-    const lead = leads[0];
+    const lead = leads.rows[0];
     if (lead.assigned_to !== req.user.id && req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Access denied' });
     }
     // Get notes
-    const [notes] = await pool.query(
+    const notes = await pool.query(
       `SELECT n.*, u.name as created_by_name FROM notes n LEFT JOIN users u ON n.created_by = u.id WHERE n.lead_id = ? ORDER BY n.createdAt DESC`,
       [lead.id]
     );
-    lead.notes = notes;
+    lead.notes = notes.rows;
     res.json(lead);
   } catch (error) {
     console.error('Get lead error:', error);
@@ -166,15 +166,15 @@ router.post('/', auth, [
       priority = 'medium',
       expectedCloseDate = null
     } = req.body;
-    const [result] = await pool.query(
+    const result = await pool.query(
       `INSERT INTO leads (name, amount, stage, pipeline, contact_name, contact_phone, contact_email, contact_position, company_name, company_address, assigned_to, created_by, source, priority, expected_close_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [name, amount, stage, pipeline, contactName, contactPhone, contactEmail, contactPosition, companyName, companyAddress, req.user.id, req.user.id, source, priority, expectedCloseDate]
     );
-    const [leads] = await pool.query(
+    const leads = await pool.query(
       `SELECT * FROM leads WHERE id = ?`,
       [result.insertId]
     );
-    res.status(201).json(leads[0]);
+    res.status(201).json(leads.rows[0]);
     
     // Log lead creation activity
     await activityLogger.logLeadCreated(
@@ -198,14 +198,14 @@ router.put('/:id', auth, async (req, res) => {
   console.log('User:', req.user);
   
   try {
-    const [leads] = await pool.query(
+    const leads = await pool.query(
       `SELECT * FROM leads WHERE id = ?`,
       [req.params.id]
     );
-    if (leads.length === 0) {
+    if (leads.rows.length === 0) {
       return res.status(404).json({ message: 'Lead not found' });
     }
-    const lead = leads[0];
+    const lead = leads.rows[0];
     console.log('Current lead data:', lead);
     
     if (lead.assigned_to !== req.user.id && req.user.role !== 'admin') {
@@ -277,11 +277,11 @@ router.put('/:id', auth, async (req, res) => {
       `UPDATE leads SET ${updates.join(', ')} WHERE id = ?`,
       params
     );
-    const [updatedLeads] = await pool.query(
+    const updatedLeads = await pool.query(
       `SELECT * FROM leads WHERE id = ?`,
       [req.params.id]
     );
-    res.json(updatedLeads[0]);
+    res.json(updatedLeads.rows[0]);
     
     // Log lead update activity
     if (req.body.stage && req.body.stage !== lead.stage) {
@@ -304,14 +304,14 @@ router.patch('/:id/stage', auth, async (req, res) => {
   const { id } = req.params;
   const { stage } = req.body;
   try {
-    const [leads] = await pool.query(
+    const leads = await pool.query(
       `SELECT * FROM leads WHERE id = ?`,
       [id]
     );
-    if (leads.length === 0) {
+    if (leads.rows.length === 0) {
       return res.status(404).json({ message: 'Lead not found' });
     }
-    const lead = leads[0];
+    const lead = leads.rows[0];
     if (lead.assigned_to !== req.user.id && req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Access denied' });
     }
@@ -339,14 +339,14 @@ router.patch('/:id/stage', auth, async (req, res) => {
 // DELETE /api/leads/:id - Delete a lead
 router.delete('/:id', auth, async (req, res) => {
   try {
-    const [leads] = await pool.query(
+    const leads = await pool.query(
       `SELECT * FROM leads WHERE id = ?`,
       [req.params.id]
     );
-    if (leads.length === 0) {
+    if (leads.rows.length === 0) {
       return res.status(404).json({ message: 'Lead not found' });
     }
-    const lead = leads[0];
+    const lead = leads.rows[0];
     if (lead.assigned_to !== req.user.id && req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Access denied' });
     }
@@ -370,14 +370,14 @@ router.post('/:id/notes', auth, [
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
     }
-    const [leads] = await pool.query(
+    const leads = await pool.query(
       `SELECT * FROM leads WHERE id = ?`,
       [req.params.id]
     );
-    if (leads.length === 0) {
+    if (leads.rows.length === 0) {
       return res.status(404).json({ message: 'Lead not found' });
     }
-    const lead = leads[0];
+    const lead = leads.rows[0];
     if (lead.assigned_to !== req.user.id && req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Access denied' });
     }
@@ -386,11 +386,11 @@ router.post('/:id/notes', auth, [
       [req.params.id, req.body.content, req.user.id]
     );
     // Return updated notes
-    const [notes] = await pool.query(
+    const notes = await pool.query(
       `SELECT n.*, u.name as created_by_name FROM notes n LEFT JOIN users u ON n.created_by = u.id WHERE n.lead_id = ? ORDER BY n.createdAt DESC`,
       [req.params.id]
     );
-    res.json(notes);
+    res.json(notes.rows);
   } catch (error) {
     console.error('Add note error:', error);
     res.status(500).json({ message: 'Server error' });
@@ -407,15 +407,15 @@ router.patch('/:id/stage', auth, [
       return res.status(400).json({ errors: errors.array() });
     }
     
-    const [leads] = await pool.query(
+    const leads = await pool.query(
       `SELECT * FROM leads WHERE id = ?`,
       [req.params.id]
     );
-    if (leads.length === 0) {
+    if (leads.rows.length === 0) {
       return res.status(404).json({ message: 'Lead not found' });
     }
     
-    const lead = leads[0];
+    const lead = leads.rows[0];
     if (lead.assigned_to !== req.user.id && req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Access denied' });
     }
@@ -458,27 +458,27 @@ router.get('/stats/overview', auth, async (req, res) => {
   try {
     let where = 'WHERE assigned_to = ?';
     let params = [req.user.id];
-    const [stats] = await pool.query(
+    const stats = await pool.query(
       `SELECT stage, COUNT(*) as count, SUM(amount) as totalAmount FROM leads ${where} GROUP BY stage`,
       params
     );
-    const [statusStats] = await pool.query(
+    const statusStats = await pool.query(
       `SELECT status, COUNT(*) as count FROM leads ${where} GROUP BY status`,
       params
     );
-    const [totalLeadsRow] = await pool.query(
+    const totalLeadsRow = await pool.query(
       `SELECT COUNT(*) as totalLeads FROM leads ${where}`,
       params
     );
-    const [totalAmountRow] = await pool.query(
+    const totalAmountRow = await pool.query(
       `SELECT SUM(amount) as totalAmount FROM leads ${where}`,
       params
     );
     res.json({
-      stageStats: stats,
-      statusStats,
-      totalLeads: totalLeadsRow[0].totalLeads,
-      totalAmount: totalAmountRow[0].totalAmount || 0
+      stageStats: stats.rows,
+      statusStats: statusStats.rows,
+      totalLeads: totalLeadsRow.rows[0].totalLeads,
+      totalAmount: totalAmountRow.rows[0].totalAmount || 0
     });
   } catch (error) {
     console.error('Get stats error:', error);
@@ -493,13 +493,13 @@ router.get('/stats/win-loss', auth, async (req, res) => {
     let params = [req.user.id];
     
     // Get total new leads (leads created in the last 30 days)
-    const [newLeadsResult] = await pool.query(
+    const newLeadsResult = await pool.query(
       `SELECT COUNT(*) as count FROM leads ${where} AND createdAt >= DATE_SUB(NOW(), INTERVAL 30 DAY)`,
       params
     );
     
     // Get stage-wise analysis with entered and lost counts
-    const [stageAnalysis] = await pool.query(`
+    const stageAnalysis = await pool.query(`
       SELECT 
         stage,
         COUNT(*) as currentLeads,
@@ -523,7 +523,7 @@ router.get('/stats/win-loss', auth, async (req, res) => {
     `, params);
     
     // Get historical stage transitions (entered counts)
-    const [stageTransitions] = await pool.query(`
+    const stageTransitions = await pool.query(`
       SELECT 
         stage,
         COUNT(*) as enteredCount
@@ -542,7 +542,7 @@ router.get('/stats/win-loss', auth, async (req, res) => {
     `, params);
     
     // Get overall win/loss summary
-    const [overallStats] = await pool.query(`
+    const overallStats = await pool.query(`
       SELECT 
         COUNT(*) as totalLeads,
         SUM(CASE WHEN status = 'won' THEN 1 ELSE 0 END) as totalWon,
@@ -587,9 +587,9 @@ router.get('/stats/win-loss', auth, async (req, res) => {
     });
     
     res.json({
-      newLeads: newLeadsResult[0].count,
+      newLeads: newLeadsResult.rows[0].count,
       pipelineStages: formattedStages,
-      overallStats: overallStats[0],
+      overallStats: overallStats.rows[0],
       pipelineSummary: formattedStages.map(stage => ({
         stage: stage.name,
         leads: stage.leads
@@ -604,11 +604,11 @@ router.get('/stats/win-loss', auth, async (req, res) => {
 // GET /api/leads/emails - Get all unique contact emails for the logged-in user
 router.get('/emails', auth, async (req, res) => {
   try {
-    const [rows] = await pool.query(
+    const rows = await pool.query(
       'SELECT DISTINCT contact_email FROM leads WHERE contact_email IS NOT NULL AND contact_email != "" ORDER BY contact_email',
       []
     );
-    const emails = rows.map(r => r.contact_email).filter(Boolean);
+    const emails = rows.rows.map(r => r.contact_email).filter(Boolean);
     res.json({ emails });
   } catch (error) {
     console.error('Get lead emails error:', error);
@@ -619,11 +619,11 @@ router.get('/emails', auth, async (req, res) => {
 // GET /api/leads/emails/public - Get all unique contact emails without authentication
 router.get('/emails/public', async (req, res) => {
   try {
-    const [rows] = await pool.query(
+    const rows = await pool.query(
       'SELECT DISTINCT contact_email FROM leads WHERE contact_email IS NOT NULL AND contact_email != "" ORDER BY contact_email',
       []
     );
-    const emails = rows.map(r => r.contact_email).filter(Boolean);
+    const emails = rows.rows.map(r => r.contact_email).filter(Boolean);
     res.json({ emails });
   } catch (error) {
     console.error('Get public lead emails error:', error);
