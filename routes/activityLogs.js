@@ -7,12 +7,12 @@ const router = express.Router();
 // Test endpoint without authentication
 router.get('/test', async (req, res) => {
   try {
-    const activities = await pool.query('SELECT COUNT(*) as count FROM activity_logs');
-    res.json({ 
-      message: 'Activity logs test successful', 
-      count: activities[0].count,
-      timestamp: new Date().toISOString()
-    });
+     const activities = await pool.query('SELECT COUNT(*) as count FROM activity_logs');
+     res.json({ 
+       message: 'Activity logs test successful', 
+       count: activities.rows[0].count,
+       timestamp: new Date().toISOString()
+     });
   } catch (error) {
     console.error('Test endpoint error:', error);
     res.status(500).json({ message: 'Test failed', error: error.message });
@@ -37,31 +37,31 @@ router.post('/test', async (req, res) => {
 router.get('/test-db', async (req, res) => {
   try {
     // Test if table exists
-    const [tables] = await pool.query(`
-      SELECT TABLE_NAME 
-      FROM information_schema.TABLES 
-      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'activity_logs'
-    `);
-    
-    if (tables.length === 0) {
-      return res.json({ 
-        message: 'Activity logs table does not exist',
-        tables: tables
-      });
-    }
-    
-    // Test table structure
-    const [columns] = await pool.query(`
-      SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE, COLUMN_DEFAULT
-      FROM information_schema.COLUMNS 
-      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'activity_logs'
-      ORDER BY ORDINAL_POSITION
-    `);
+     const tables = await pool.query(`
+       SELECT TABLE_NAME 
+       FROM information_schema.TABLES 
+       WHERE TABLE_SCHEMA = current_database() AND TABLE_NAME = 'activity_logs'
+     `);
+     
+     if (tables.rows.length === 0) {
+       return res.json({ 
+         message: 'Activity logs table does not exist',
+         tables: tables.rows
+       });
+     }
+     
+     // Test table structure
+     const columns = await pool.query(`
+       SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE, COLUMN_DEFAULT
+       FROM information_schema.COLUMNS 
+       WHERE TABLE_SCHEMA = current_database() AND TABLE_NAME = 'activity_logs'
+       ORDER BY ORDINAL_POSITION
+     `);
     
     res.json({ 
       message: 'Activity logs table exists',
       tableExists: true,
-      columns: columns
+      columns: columns.rows
     });
     
   } catch (error) {
@@ -167,7 +167,7 @@ router.post('/', async (req, res) => {
     const query = `
       INSERT INTO activity_logs 
       (user_id, object_type, object_id, object_name, event_type, event_description, value_before, value_after, impact, priority)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       VALUES (?, $2, $3, $4, $5, $6, $7, $8, $9, ?0)
     `;
 
     const params = [
@@ -187,11 +187,11 @@ router.post('/', async (req, res) => {
 
     const result = await pool.query(query, params);
 
-    console.log('Activity log created successfully with ID:', result.insertId);
+     console.log('Activity log created successfully with ID:', result.rows[0].id);
 
     res.status(201).json({
       message: 'Activity log created successfully',
-      id: result.insertId
+      id: result.rows[0].id
     });
 
   } catch (error) {
@@ -241,11 +241,11 @@ router.get('/:id', auth, async (req, res) => {
 
     const activities = await pool.query(query, [id]);
 
-    if (activities.length === 0) {
-      return res.status(404).json({ message: 'Activity log not found' });
-    }
+     if (activities.rows.length === 0) {
+       return res.status(404).json({ message: 'Activity log not found' });
+     }
 
-    const activity = activities[0];
+     const activity = activities.rows[0];
     activity.valueBefore = JSON.parse(activity.valueBefore || '[]');
     activity.valueAfter = JSON.parse(activity.valueAfter || '[]');
 
@@ -269,7 +269,7 @@ router.delete('/:id', auth, async (req, res) => {
 
     const result = await pool.query('DELETE FROM activity_logs WHERE id = ?', [id]);
 
-    if (result.affectedRows === 0) {
+     if (result.rowCount === 0) {
       return res.status(404).json({ message: 'Activity log not found' });
     }
 
