@@ -246,8 +246,8 @@ router.put('/:id', auth, async (req, res) => {
         console.log(`Current value: "${currentValue}", New value: "${value}"`);
         
         // Handle null/undefined current values properly
-        const normalizedCurrentValue = currentValue === null || currentValue === undefined $1 '' : String(currentValue);
-        const normalizedNewValue = value === null || value === undefined $1 '' : String(value);
+        const normalizedCurrentValue = currentValue === null || currentValue === undefined ? '' : String(currentValue);
+        const normalizedNewValue = value === null || value === undefined ? '' : String(value);
         
         if (normalizedCurrentValue !== normalizedNewValue) {
           console.log(`Values are different, adding to updates`);
