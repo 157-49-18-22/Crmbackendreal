@@ -7,7 +7,7 @@ const router = express.Router();
 // Test endpoint without authentication
 router.get('/test', async (req, res) => {
   try {
-    const [activities] = await pool.execute('SELECT COUNT(*) as count FROM activity_logs');
+    const activities = await pool.query('SELECT COUNT(*) as count FROM activity_logs');
     res.json({ 
       message: 'Activity logs test successful', 
       count: activities[0].count,
@@ -37,7 +37,7 @@ router.post('/test', async (req, res) => {
 router.get('/test-db', async (req, res) => {
   try {
     // Test if table exists
-    const [tables] = await pool.execute(`
+    const [tables] = await pool.query(`
       SELECT TABLE_NAME 
       FROM information_schema.TABLES 
       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'activity_logs'
@@ -51,7 +51,7 @@ router.get('/test-db', async (req, res) => {
     }
     
     // Test table structure
-    const [columns] = await pool.execute(`
+    const [columns] = await pool.query(`
       SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE, COLUMN_DEFAULT
       FROM information_schema.COLUMNS 
       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'activity_logs'
@@ -107,12 +107,12 @@ router.get('/', auth, async (req, res) => {
     
     query += ` ORDER BY al.created_at DESC LIMIT 50`;
 
-    const [activities] = await pool.execute(query, params);
+    const activities = await pool.query(query, params);
 
-    console.log('Query executed successfully, found', activities.length, 'activities');
+    console.log('Query executed successfully, found', activities.rows.length, 'activities');
 
     // Format activities for frontend
-    const formattedActivities = activities.map(activity => ({
+    const formattedActivities = activities.rows.map(activity => ({
       id: activity.id,
       timestamp: new Date(activity.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       action: activity.action,
@@ -185,7 +185,7 @@ router.post('/', async (req, res) => {
 
     console.log('Executing query with params:', params);
 
-    const [result] = await pool.execute(query, params);
+    const result = await pool.query(query, params);
 
     console.log('Activity log created successfully with ID:', result.insertId);
 
@@ -239,7 +239,7 @@ router.get('/:id', auth, async (req, res) => {
       WHERE al.id = ?
     `;
 
-    const [activities] = await pool.execute(query, [id]);
+    const activities = await pool.query(query, [id]);
 
     if (activities.length === 0) {
       return res.status(404).json({ message: 'Activity log not found' });
@@ -267,7 +267,7 @@ router.delete('/:id', auth, async (req, res) => {
       return res.status(403).json({ message: 'Access denied. Admin only.' });
     }
 
-    const [result] = await pool.execute('DELETE FROM activity_logs WHERE id = ?', [id]);
+    const result = await pool.query('DELETE FROM activity_logs WHERE id = ?', [id]);
 
     if (result.affectedRows === 0) {
       return res.status(404).json({ message: 'Activity log not found' });
