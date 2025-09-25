@@ -39,12 +39,12 @@ router.post('/register', [
     }
 
     // Check if user already exists
-    const [existingUsers] = await pool.query(
+    const existingUsers = await pool.query(
       'SELECT id FROM users WHERE email = ?',
       [email]
     );
 
-    if (existingUsers.length > 0) {
+    if (existingUsers.rows.length > 0) {
       return res.status(400).json({ message: 'User already exists' });
     }
 
@@ -170,12 +170,12 @@ router.post('/refresh', async (req, res) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
     // Check if user still exists
-    const [users] = await pool.query(
+    const users = await pool.query(
       'SELECT id, name, email, role, avatar, isActive FROM users WHERE id = ?',
       [decoded.userId]
     );
     
-    if (users.length === 0) {
+    if (users.rows.length === 0) {
       return res.status(401).json({ message: 'User not found' });
     }
 
@@ -205,12 +205,12 @@ router.get('/me', async (req, res) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
-    const [users] = await pool.query(
+    const users = await pool.query(
       'SELECT id, name, email, role, avatar, isActive, createdAt FROM users WHERE id = ?',
       [decoded.userId]
     );
 
-    if (users.length === 0) {
+    if (users.rows.length === 0) {
       return res.status(401).json({ message: 'Token is not valid' });
     }
 
@@ -243,12 +243,12 @@ router.put('/profile', [
     const { name, email, avatar } = req.body;
 
     // Check if email is already taken by another user
-    const [existingUsers] = await pool.query(
+    const existingUsers = await pool.query(
       'SELECT id FROM users WHERE email = ? AND id != ?',
       [email, decoded.userId]
     );
 
-    if (existingUsers.length > 0) {
+    if (existingUsers.rows.length > 0) {
       return res.status(400).json({ message: 'Email already in use' });
     }
 
@@ -259,7 +259,7 @@ router.put('/profile', [
     );
 
     // Get updated user
-    const [users] = await pool.query(
+    const users = await pool.query(
       'SELECT id, name, email, role, avatar, isActive, createdAt FROM users WHERE id = ?',
       [decoded.userId]
     );
