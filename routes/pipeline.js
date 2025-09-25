@@ -9,11 +9,11 @@ router.get('/test', async (req, res) => {
     console.log('Testing database connection...');
     
     // Check if pipelines table exists and has data
-    const [pipelines] = await pool.execute('SELECT * FROM pipelines');
-    console.log('All pipelines:', pipelines);
+    const pipelines = await pool.query('SELECT * FROM pipelines');
+    console.log('All pipelines:', pipelines.rows);
     
     // Check if pipeline_stages table has data
-    const [stages] = await pool.execute('SELECT * FROM pipeline_stages');
+    const stages = await pool.query('SELECT * FROM pipeline_stages');
     console.log('All stages:', stages);
     
     res.json({ 
@@ -33,7 +33,7 @@ router.get('/test', async (req, res) => {
 router.get('/', async (req, res) => {
   try {
     // Get the default pipeline with all its stages and hints
-    const [pipelines] = await pool.execute(`
+    const pipelines = await pool.query(`
       SELECT p.id, p.name, p.description, p.is_default 
       FROM pipelines p 
       WHERE p.is_default = TRUE 
@@ -48,20 +48,20 @@ router.get('/', async (req, res) => {
     const pipelineId = pipelines[0].id;
 
     // Get all stages for this pipeline
-    const [stages] = await pool.execute(`
+    const stages = await pool.query(`
       SELECT ps.id, ps.stage_key, ps.stage_name, ps.stage_order, ps.is_default, ps.is_custom
       FROM pipeline_stages ps 
-      WHERE ps.pipeline_id = ? 
+      WHERE ps.pipeline_id = $1 
       ORDER BY ps.stage_order
     `, [pipelineId]);
 
     // Get all hints for each stage
     const columns = [];
     for (const stage of stages) {
-      const [hints] = await pool.execute(`
+      const hints = await pool.query(`
         SELECT ph.hint_type, ph.hint_text
         FROM pipeline_hints ph 
-        WHERE ph.stage_id = ?
+        WHERE ph.stage_id = $1
       `, [stage.id]);
 
       const hintsObj = {};
@@ -91,13 +91,13 @@ router.post('/', async (req, res) => {
     const { columns } = req.body;
     
     // Get or create default pipeline
-    let [pipelines] = await pool.execute(`
+    let [pipelines] = await pool.query(`
       SELECT id FROM pipelines WHERE is_default = TRUE LIMIT 1
     `);
     
     let pipelineId;
     if (pipelines.length === 0) {
-      const [result] = await pool.execute(`
+      const result = await pool.query(`
         INSERT INTO pipelines (name, description, is_default, created_by) 
         VALUES ('Sales Pipeline', 'Default sales pipeline', TRUE, 1)
       `);
@@ -107,14 +107,14 @@ router.post('/', async (req, res) => {
     }
 
     // Clear existing stages for this pipeline
-    await pool.execute('DELETE FROM pipeline_stages WHERE pipeline_id = ?', [pipelineId]);
+    await pool.query('DELETE FROM pipeline_stages WHERE pipeline_id = $1', [pipelineId]);
 
     // Insert new stages
     for (let i = 0; i < columns.length; i++) {
       const column = columns[i];
-      const [stageResult] = await pool.execute(`
+      const stageResult = await pool.query(`
         INSERT INTO pipeline_stages (pipeline_id, stage_key, stage_name, stage_order, is_default, is_custom) 
-        VALUES (?, ?, ?, ?, ?, ?)
+        VALUES ($1, $1, $1, $1, $1, $1)
       `, [
         pipelineId,
         column.key,
@@ -131,9 +131,9 @@ router.post('/', async (req, res) => {
         const hintTypes = ['beginner', 'intermediate', 'expert'];
         for (const hintType of hintTypes) {
           if (column.hints[hintType]) {
-            await pool.execute(`
+            await pool.query(`
               INSERT INTO pipeline_hints (stage_id, hint_type, hint_text) 
-              VALUES (?, ?, ?)
+              VALUES ($1, $1, $1)
             `, [stageId, hintType, column.hints[hintType]]);
           }
         }
@@ -150,13 +150,13 @@ router.post('/', async (req, res) => {
 // GET /api/pipeline/all - fetch all pipelines with their stages
 router.get('/all', async (req, res) => {
   try {
-    const [pipelines] = await pool.execute(`SELECT id, name, description, is_default FROM pipelines`);
+    const pipelines = await pool.query(`SELECT id, name, description, is_default FROM pipelines`);
     const result = [];
-    for (const pipeline of pipelines) {
-      const [stages] = await pool.execute(`
+    for (const pipeline of pipelines.rows) {
+      const stages = await pool.query(`
         SELECT id, stage_key, stage_name, stage_order, is_default, is_custom
         FROM pipeline_stages
-        WHERE pipeline_id = ?
+        WHERE pipeline_id = $1
         ORDER BY stage_order
       `, [pipeline.id]);
       result.push({
@@ -164,7 +164,7 @@ router.get('/all', async (req, res) => {
         name: pipeline.name,
         description: pipeline.description,
         isDefault: pipeline.is_default,
-        stages: stages.map(s => ({
+        stages: stages.rows.map(s => ({
           id: s.id,
           key: s.stage_key,
           label: s.stage_name,
@@ -188,15 +188,15 @@ router.post('/all', async (req, res) => {
     if (!name || !Array.isArray(stages) || stages.length === 0) {
       return res.status(400).json({ message: 'Name and stages are required' });
     }
-    const [result] = await pool.execute(`
-      INSERT INTO pipelines (name, is_default, created_by) VALUES (?, FALSE, 1)
+    const result = await pool.query(`
+      INSERT INTO pipelines (name, is_default, created_by) VALUES ($1, FALSE, 1)
     `, [name]);
     const pipelineId = result.insertId;
     for (let i = 0; i < stages.length; i++) {
       const stage = stages[i];
-      await pool.execute(`
+      await pool.query(`
         INSERT INTO pipeline_stages (pipeline_id, stage_key, stage_name, stage_order, is_default, is_custom)
-        VALUES (?, ?, ?, ?, ?, ?)
+        VALUES ($1, $1, $1, $1, $1, $1)
       `, [
         pipelineId,
         stage.key || stage.label.toLowerCase().replace(/ /g, ''),
@@ -218,10 +218,10 @@ router.get('/:id', async (req, res) => {
   try {
     const pipelineId = req.params.id;
     
-    const [pipelines] = await pool.execute(`
+    const pipelines = await pool.query(`
       SELECT p.id, p.name, p.description, p.is_default 
       FROM pipelines p 
-      WHERE p.id = ?
+      WHERE p.id = $1
     `, [pipelineId]);
 
     if (pipelines.length === 0) {
@@ -229,20 +229,20 @@ router.get('/:id', async (req, res) => {
     }
 
     // Get all stages for this pipeline
-    const [stages] = await pool.execute(`
+    const stages = await pool.query(`
       SELECT ps.id, ps.stage_key, ps.stage_name, ps.stage_order, ps.is_default, ps.is_custom
       FROM pipeline_stages ps 
-      WHERE ps.pipeline_id = ? 
+      WHERE ps.pipeline_id = $1 
       ORDER BY ps.stage_order
     `, [pipelineId]);
 
     // Get all hints for each stage
     const columns = [];
     for (const stage of stages) {
-      const [hints] = await pool.execute(`
+      const hints = await pool.query(`
         SELECT ph.hint_type, ph.hint_text
         FROM pipeline_hints ph 
-        WHERE ph.stage_id = ?
+        WHERE ph.stage_id = $1
       `, [stage.id]);
 
       const hintsObj = {};
@@ -312,8 +312,8 @@ router.put('/:id', async (req, res) => {
     }
     
     // Check if pipeline exists
-    const [pipelines] = await pool.execute(`
-      SELECT id FROM pipelines WHERE id = ?
+    const pipelines = await pool.query(`
+      SELECT id FROM pipelines WHERE id = $1
     `, [pipelineId]);
     
     console.log('Found pipelines:', pipelines);
@@ -326,7 +326,7 @@ router.put('/:id', async (req, res) => {
     // Update name if provided
     if (name) {
       console.log('Updating pipeline name to:', name);
-      await pool.execute('UPDATE pipelines SET name = ? WHERE id = ?', [name, pipelineId]);
+      await pool.query('UPDATE pipelines SET name = $1 WHERE id = $1', [name, pipelineId]);
     }
     
     // Update stages if columns are provided
@@ -335,7 +335,7 @@ router.put('/:id', async (req, res) => {
       console.log('Columns to insert:', columns);
       
       // Clear existing stages for this pipeline
-      await pool.execute('DELETE FROM pipeline_stages WHERE pipeline_id = ?', [pipelineId]);
+      await pool.query('DELETE FROM pipeline_stages WHERE pipeline_id = $1', [pipelineId]);
       console.log('Cleared existing stages');
 
       // Insert new stages
@@ -344,9 +344,9 @@ router.put('/:id', async (req, res) => {
         console.log(`Inserting stage ${i + 1}:`, column);
         
         try {
-          const [stageResult] = await pool.execute(`
+          const stageResult = await pool.query(`
             INSERT INTO pipeline_stages (pipeline_id, stage_key, stage_name, stage_order, is_default, is_custom) 
-            VALUES (?, ?, ?, ?, ?, ?)
+            VALUES ($1, $1, $1, $1, $1, $1)
           `, [
             pipelineId,
             column.key,
@@ -364,9 +364,9 @@ router.put('/:id', async (req, res) => {
             const hintTypes = ['beginner', 'intermediate', 'expert'];
             for (const hintType of hintTypes) {
               if (column.hints[hintType]) {
-                await pool.execute(`
+                await pool.query(`
                   INSERT INTO pipeline_hints (stage_id, hint_type, hint_text) 
-                  VALUES (?, ?, ?)
+                  VALUES ($1, $1, $1)
                 `, [stageId, hintType, column.hints[hintType]]);
               }
             }
@@ -392,9 +392,9 @@ router.delete('/:id', async (req, res) => {
   try {
     const pipelineId = req.params.id;
     // Delete all stages (and cascade to hints)
-    await pool.execute('DELETE FROM pipeline_stages WHERE pipeline_id = ?', [pipelineId]);
+    await pool.query('DELETE FROM pipeline_stages WHERE pipeline_id = $1', [pipelineId]);
     // Delete the pipeline
-    await pool.execute('DELETE FROM pipelines WHERE id = ?', [pipelineId]);
+    await pool.query('DELETE FROM pipelines WHERE id = $1', [pipelineId]);
     res.json({ message: 'Pipeline deleted!' });
   } catch (error) {
     console.error('Delete pipeline error:', error);
