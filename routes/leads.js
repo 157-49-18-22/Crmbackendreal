@@ -463,7 +463,7 @@ router.get('/stats/overview', auth, async (req, res) => {
       params
     );
     const statusStats = await pool.query(
-      `SELECT status, COUNT(*) as count FROM leads ${where} GROUP BY status`,
+      `SELECT stage as status, COUNT(*) as count FROM leads ${where} GROUP BY stage`,
       params
     );
     const totalLeadsRow = await pool.query(
@@ -504,10 +504,10 @@ router.get('/stats/win-loss', auth, async (req, res) => {
         stage,
         COUNT(*) as currentLeads,
         SUM(amount) as currentAmount,
-        SUM(CASE WHEN status = 'won' THEN 1 ELSE 0 END) as wonCount,
-        SUM(CASE WHEN status = 'lost' THEN 1 ELSE 0 END) as lostCount,
-        SUM(CASE WHEN status = 'won' THEN amount ELSE 0 END) as wonAmount,
-        SUM(CASE WHEN status = 'lost' THEN amount ELSE 0 END) as lostAmount
+        SUM(CASE WHEN stage = 'Won' THEN 1 ELSE 0 END) as wonCount,
+        SUM(CASE WHEN stage = 'Lost' THEN 1 ELSE 0 END) as lostCount,
+        SUM(CASE WHEN stage = 'Won' THEN amount ELSE 0 END) as wonAmount,
+        SUM(CASE WHEN stage = 'Lost' THEN amount ELSE 0 END) as lostAmount
       FROM leads ${where}
       GROUP BY stage
       ORDER BY 
@@ -545,12 +545,12 @@ router.get('/stats/win-loss', auth, async (req, res) => {
     const overallStats = await pool.query(`
       SELECT 
         COUNT(*) as totalLeads,
-        SUM(CASE WHEN status = 'won' THEN 1 ELSE 0 END) as totalWon,
-        SUM(CASE WHEN status = 'lost' THEN 1 ELSE 0 END) as totalLost,
-        SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) as totalActive,
+        SUM(CASE WHEN stage = 'Won' THEN 1 ELSE 0 END) as totalWon,
+        SUM(CASE WHEN stage = 'Lost' THEN 1 ELSE 0 END) as totalLost,
+        SUM(CASE WHEN stage NOT IN ('Won', 'Lost') THEN 1 ELSE 0 END) as totalActive,
         SUM(amount) as totalAmount,
-        SUM(CASE WHEN status = 'won' THEN amount ELSE 0 END) as totalWonAmount,
-        SUM(CASE WHEN status = 'lost' THEN amount ELSE 0 END) as totalLostAmount
+        SUM(CASE WHEN stage = 'Won' THEN amount ELSE 0 END) as totalWonAmount,
+        SUM(CASE WHEN stage = 'Lost' THEN amount ELSE 0 END) as totalLostAmount
       FROM leads ${where}
     `, params);
     
