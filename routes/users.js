@@ -23,7 +23,7 @@ router.get('/', adminAuth, async (req, res) => {
 router.get('/employees', adminAuth, async (req, res) => {
   try {
     const employees = await pool.query(
-      'SELECT id, name, email, role, avatar, isActive, createdAt FROM users WHERE role IN (?, $2) ORDER BY createdAt DESC',
+      'SELECT id, name, email, role, avatar, isActive, createdAt FROM users WHERE role IN ($1, $2) ORDER BY createdAt DESC',
       ['employee', 'manager']
     );
     res.json(employees.rows);
@@ -49,12 +49,12 @@ router.post('/employees', adminAuth, [
     const { name, email, password, role } = req.body;
 
     // Check if user already exists
-    const [existingUsers] = await pool.query(
-      'SELECT id FROM users WHERE email = ?',
+    const existingUsers = await pool.query(
+      'SELECT id FROM users WHERE email = $1',
       [email]
     );
 
-    if (existingUsers.length > 0) {
+    if (existingUsers.rows.length > 0) {
       return res.status(400).json({ message: 'User with this email already exists' });
     }
 
@@ -63,14 +63,14 @@ router.post('/employees', adminAuth, [
     const hashedPassword = await bcrypt.hash(password, salt);
 
     // Create new user with specified role
-    const [result] = await pool.query(
-      'INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)',
+    const result = await pool.query(
+      'INSERT INTO users (name, email, password, role) VALUES ($1, $1, $1, $1)',
       [name, email, hashedPassword, role]
     );
 
     // Get the created user
-    const [users] = await pool.query(
-      'SELECT id, name, email, role, avatar, isActive, createdAt FROM users WHERE id = ?',
+    const users = await pool.query(
+      'SELECT id, name, email, role, avatar, isActive, createdAt FROM users WHERE id = $1',
       [result.insertId]
     );
 
@@ -87,11 +87,11 @@ router.post('/employees', adminAuth, [
 // GET /api/users/:id - Get user by ID
 router.get('/:id', auth, async (req, res) => {
   try {
-    const [users] = await pool.query(
-      'SELECT id, name, email, role, avatar, isActive, createdAt FROM users WHERE id = ?',
+    const users = await pool.query(
+      'SELECT id, name, email, role, avatar, isActive, createdAt FROM users WHERE id = $1',
       [req.params.id]
     );
-    if (users.length === 0) {
+    if (users.rows.length === 0) {
       return res.status(404).json({ message: 'User not found' });
     }
     // Users can only view their own profile unless they're admin
@@ -120,29 +120,29 @@ router.put('/:id', auth, [
       return res.status(403).json({ message: 'Access denied' });
     }
     const { name, email, role, isActive } = req.body;
-    const updates = ['name = ?', 'email = ?'];
+    const updates = ['name = $1', 'email = $1'];
     const params = [name, email];
     // Only admins can update role and isActive
     if (req.user.role === 'admin') {
       if (role) {
-        updates.push('role = ?');
+        updates.push('role = $1');
         params.push(role);
       }
       if (typeof isActive === 'boolean') {
-        updates.push('isActive = ?');
+        updates.push('isActive = $1');
         params.push(isActive);
       }
     }
     params.push(req.params.id);
     await pool.query(
-      `UPDATE users SET ${updates.join(', ')} WHERE id = ?`,
+      `UPDATE users SET ${updates.join(', ')} WHERE id = $1`,
       params
     );
-    const [users] = await pool.query(
-      'SELECT id, name, email, role, avatar, isActive, createdAt FROM users WHERE id = ?',
+    const users = await pool.query(
+      'SELECT id, name, email, role, avatar, isActive, createdAt FROM users WHERE id = $1',
       [req.params.id]
     );
-    if (users.length === 0) {
+    if (users.rows.length === 0) {
       return res.status(404).json({ message: 'User not found' });
     }
     res.json(users[0]);
@@ -155,11 +155,11 @@ router.put('/:id', auth, [
 // DELETE /api/users/:id - Delete user (admin only)
 router.delete('/:id', adminAuth, async (req, res) => {
   try {
-    const [users] = await pool.query(
-      'SELECT id FROM users WHERE id = ?',
+    const users = await pool.query(
+      'SELECT id FROM users WHERE id = $1',
       [req.params.id]
     );
-    if (users.length === 0) {
+    if (users.rows.length === 0) {
       return res.status(404).json({ message: 'User not found' });
     }
     // Prevent admin from deleting themselves
@@ -167,7 +167,7 @@ router.delete('/:id', adminAuth, async (req, res) => {
       return res.status(400).json({ message: 'Cannot delete your own account' });
     }
     await pool.query(
-      'DELETE FROM users WHERE id = ?',
+      'DELETE FROM users WHERE id = $1',
       [req.params.id]
     );
     res.json({ message: 'User removed' });
