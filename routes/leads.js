@@ -494,7 +494,7 @@ router.get('/stats/win-loss', auth, async (req, res) => {
     
     // Get total new leads (leads created in the last 30 days)
     const newLeadsResult = await pool.query(
-      `SELECT COUNT(*) as count FROM leads ${where} AND createdAt >= DATE_SUB(NOW(), INTERVAL 30 DAY)`,
+      `SELECT COUNT(*) as count FROM leads ${where} AND createdAt >= NOW() - INTERVAL '30 days'`,
       params
     );
     
