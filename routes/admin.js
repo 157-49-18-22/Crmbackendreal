@@ -7,12 +7,12 @@ const router = express.Router();
 // Middleware to check if user is admin
 const requireAdmin = async (req, res, next) => {
   try {
-    const [rows] = await pool.execute(
+    const rows = await pool.query(
       'SELECT role FROM users WHERE id = ?',
       [req.user.id]
     );
     
-    if (rows.length === 0 || rows[0].role !== 'admin') {
+    if (rows.rows.rows.length === 0 || rows.rows.rows[0].role !== 'admin') {
       return res.status(403).json({ message: 'Admin access required' });
     }
     
@@ -27,27 +27,27 @@ const requireAdmin = async (req, res, next) => {
 router.get('/stats', auth, requireAdmin, async (req, res) => {
   try {
     // Get total admins (users with admin role)
-    const [adminsResult] = await pool.execute('SELECT COUNT(*) as count FROM users WHERE role = "admin"');
+    const [adminsResult] = await pool.query('SELECT COUNT(*) as count FROM users WHERE role = "admin"');
     const totalAdmins = adminsResult[0].count;
 
     // Get total leads
-    const [leadsResult] = await pool.execute('SELECT COUNT(*) as count FROM leads');
+    const [leadsResult] = await pool.query('SELECT COUNT(*) as count FROM leads');
     const totalLeads = leadsResult[0].count;
 
     // Get total messages sent (assuming messages table exists)
-    const [messagesResult] = await pool.execute('SELECT COUNT(*) as count FROM messages');
+    const [messagesResult] = await pool.query('SELECT COUNT(*) as count FROM messages');
     const totalMessages = messagesResult[0].count || 0;
 
     // Get total revenue (assuming payments table exists)
-    const [revenueResult] = await pool.execute('SELECT SUM(amount) as total FROM payments WHERE status = "completed"');
+    const [revenueResult] = await pool.query('SELECT SUM(amount) as total FROM payments WHERE status = "completed"');
     const totalRevenue = revenueResult[0].total || 0;
 
     // Get active packages count
-    const [packagesResult] = await pool.execute('SELECT COUNT(*) as count FROM packages WHERE status = "active"');
+    const [packagesResult] = await pool.query('SELECT COUNT(*) as count FROM packages WHERE status = "active"');
     const activePackages = packagesResult[0].count;
 
     // Get pending permissions
-    const [permissionsResult] = await pool.execute('SELECT COUNT(*) as count FROM user_permissions WHERE status = "pending"');
+    const [permissionsResult] = await pool.query('SELECT COUNT(*) as count FROM user_permissions WHERE status = "pending"');
     const pendingPermissions = permissionsResult[0].count;
 
     res.json({
@@ -67,7 +67,7 @@ router.get('/stats', auth, requireAdmin, async (req, res) => {
 // Get advertisements
 router.get('/advertisements', auth, requireAdmin, async (req, res) => {
   try {
-    const [rows] = await pool.execute(`
+    const rows = await pool.query(`
       SELECT 
         id, 
         title, 
@@ -94,7 +94,7 @@ router.post('/advertisements', auth, requireAdmin, async (req, res) => {
   try {
     const { title, description, imageUrl, targetAudience, budget } = req.body;
     
-    const [result] = await pool.execute(`
+    const result = await pool.query(`
       INSERT INTO advertisements (title, description, image_url, target_audience, budget, status, created_at)
       VALUES (?, ?, ?, ?, ?, 'active', NOW())
     `, [title, description, imageUrl, targetAudience, budget]);
@@ -115,7 +115,7 @@ router.put('/advertisements/:id', auth, requireAdmin, async (req, res) => {
     const { id } = req.params;
     const { title, description, imageUrl, targetAudience, budget, status } = req.body;
     
-    await pool.execute(`
+    await pool.query(`
       UPDATE advertisements 
       SET title = ?, description = ?, image_url = ?, target_audience = ?, budget = ?, status = ?, updated_at = NOW()
       WHERE id = ?
@@ -133,7 +133,7 @@ router.delete('/advertisements/:id', auth, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     
-    await pool.execute('DELETE FROM advertisements WHERE id = ?', [id]);
+    await pool.query('DELETE FROM advertisements WHERE id = ?', [id]);
     
     res.json({ message: 'Advertisement deleted successfully' });
   } catch (error) {
@@ -145,7 +145,7 @@ router.delete('/advertisements/:id', auth, requireAdmin, async (req, res) => {
 // Get packages
 router.get('/packages', auth, requireAdmin, async (req, res) => {
   try {
-    const [rows] = await pool.execute(`
+    const rows = await pool.query(`
       SELECT 
         p.id,
         p.name,
@@ -180,7 +180,7 @@ router.post('/packages', auth, requireAdmin, async (req, res) => {
   try {
     const { name, description, price, features, status } = req.body;
     
-    const [result] = await pool.execute(`
+    const result = await pool.query(`
       INSERT INTO packages (name, description, price, features, status, created_at)
       VALUES (?, ?, ?, ?, ?, NOW())
     `, [name, description, price, JSON.stringify(features), status]);
@@ -201,7 +201,7 @@ router.put('/packages/:id', auth, requireAdmin, async (req, res) => {
     const { id } = req.params;
     const { name, description, price, features, status } = req.body;
     
-    await pool.execute(`
+    await pool.query(`
       UPDATE packages 
       SET name = ?, description = ?, price = ?, features = ?, status = ?, updated_at = NOW()
       WHERE id = ?
@@ -217,7 +217,7 @@ router.put('/packages/:id', auth, requireAdmin, async (req, res) => {
 // Get users with permissions
 router.get('/users', auth, requireAdmin, async (req, res) => {
   try {
-    const [rows] = await pool.execute(`
+    const rows = await pool.query(`
       SELECT 
         u.id,
         u.name,
@@ -247,7 +247,7 @@ router.get('/users/:id', auth, requireAdmin, async (req, res) => {
     console.log('Fetching user details for ID:', id);
     
     // Get user details
-    const [userRows] = await pool.execute(`
+    const [userRows] = await pool.query(`
       SELECT 
         u.id,
         u.name,
@@ -267,7 +267,7 @@ router.get('/users/:id', auth, requireAdmin, async (req, res) => {
     const user = userRows[0];
     
     // Get user permissions
-    const [permissionRows] = await pool.execute(`
+    const [permissionRows] = await pool.query(`
       SELECT permission_name, status, granted_at
       FROM user_permissions
       WHERE user_id = ?
@@ -275,7 +275,7 @@ router.get('/users/:id', auth, requireAdmin, async (req, res) => {
     `, [id]);
     
     // Get user activity logs
-    const [activityRows] = await pool.execute(`
+    const [activityRows] = await pool.query(`
       SELECT 
         al.event_type as action,
         al.event_description as description,
@@ -287,21 +287,21 @@ router.get('/users/:id', auth, requireAdmin, async (req, res) => {
     `, [id]);
     
     // Get user leads count
-    const [leadsResult] = await pool.execute(`
+    const [leadsResult] = await pool.query(`
       SELECT COUNT(*) as total_leads
       FROM leads
       WHERE assigned_to = ?
     `, [id]);
     
     // Get bulk messages count
-    const [bulkMessagesResult] = await pool.execute(`
+    const [bulkMessagesResult] = await pool.query(`
       SELECT COUNT(*) as total_bulk_messages
       FROM messages
       WHERE user_id = ? AND type IN ('email', 'sms', 'whatsapp')
     `, [id]);
     
     // Get current active package details
-    const [packageResult] = await pool.execute(`
+    const [packageResult] = await pool.query(`
       SELECT 
         p.id,
         p.name,
@@ -320,14 +320,14 @@ router.get('/users/:id', auth, requireAdmin, async (req, res) => {
     `, [id]);
     
     // Get employee count (users managed by this user)
-    const [employeeResult] = await pool.execute(`
+    const [employeeResult] = await pool.query(`
       SELECT COUNT(*) as total_employees
       FROM users
       WHERE id != ?
     `, [id]);
     
     // Get recent bulk messages
-    const [recentMessagesResult] = await pool.execute(`
+    const [recentMessagesResult] = await pool.query(`
       SELECT 
         recipient,
         subject,
@@ -405,11 +405,11 @@ router.put('/users/:id/permissions', auth, requireAdmin, async (req, res) => {
     const { permissions } = req.body;
     
     // Delete existing permissions
-    await pool.execute('DELETE FROM user_permissions WHERE user_id = ?', [id]);
+    await pool.query('DELETE FROM user_permissions WHERE user_id = ?', [id]);
     
     // Add new permissions
     for (const permission of permissions) {
-      await pool.execute(`
+      await pool.query(`
         INSERT INTO user_permissions (user_id, permission_name, status, granted_at)
         VALUES (?, ?, 'granted', NOW())
       `, [id, permission]);
@@ -425,7 +425,7 @@ router.put('/users/:id/permissions', auth, requireAdmin, async (req, res) => {
 // Get user activity logs
 router.get('/activity-logs', auth, requireAdmin, async (req, res) => {
   try {
-    const [rows] = await pool.execute(`
+    const rows = await pool.query(`
       SELECT 
         al.id,
         al.user_id,
@@ -450,7 +450,7 @@ router.get('/activity-logs', auth, requireAdmin, async (req, res) => {
 // Get monthly analytics
 router.get('/analytics/monthly', auth, requireAdmin, async (req, res) => {
   try {
-    const [rows] = await pool.execute(`
+    const rows = await pool.query(`
       SELECT 
         DATE_FORMAT(created_at, '%Y-%m') as month,
         COUNT(*) as new_users,
@@ -495,21 +495,21 @@ router.get('/company-stats', auth, requireAdmin, async (req, res) => {
     }
 
     // Get total revenue
-    const [revenueResult] = await pool.execute(`
+    const [revenueResult] = await pool.query(`
       SELECT COALESCE(SUM(amount), 0) as total_revenue
       FROM payments
       WHERE status = 'completed' AND created_at >= ?
     `, [startDate]);
 
     // Get total leads
-    const [leadsResult] = await pool.execute(`
+    const [leadsResult] = await pool.query(`
       SELECT COUNT(*) as total_leads
       FROM leads
       WHERE createdAt >= ?
     `, [startDate]);
 
     // Get conversion rate
-    const [conversionResult] = await pool.execute(`
+    const [conversionResult] = await pool.query(`
       SELECT 
         COUNT(CASE WHEN status = 'won' THEN 1 END) as won_leads,
         COUNT(*) as total_leads
@@ -518,35 +518,35 @@ router.get('/company-stats', auth, requireAdmin, async (req, res) => {
     `, [startDate]);
 
     // Get active customers
-    const [customersResult] = await pool.execute(`
+    const [customersResult] = await pool.query(`
       SELECT COUNT(DISTINCT user_id) as active_customers
       FROM user_packages
       WHERE status = 'active'
     `);
 
     // Get total employees
-    const [employeesResult] = await pool.execute(`
+    const [employeesResult] = await pool.query(`
       SELECT COUNT(*) as total_employees
       FROM users
       WHERE role IN ('admin', 'user', 'manager')
     `);
 
     // Get total messages
-    const [messagesResult] = await pool.execute(`
+    const [messagesResult] = await pool.query(`
       SELECT COUNT(*) as total_messages
       FROM messages
       WHERE created_at >= ?
     `, [startDate]);
 
     // Get active packages
-    const [packagesResult] = await pool.execute(`
+    const [packagesResult] = await pool.query(`
       SELECT COUNT(*) as active_packages
       FROM packages
       WHERE status = 'active'
     `);
 
     // Get pending payments
-    const [pendingResult] = await pool.execute(`
+    const [pendingResult] = await pool.query(`
       SELECT COALESCE(SUM(amount), 0) as pending_payments
       FROM payments
       WHERE status = 'pending'
@@ -599,7 +599,7 @@ router.get('/revenue-data', auth, requireAdmin, async (req, res) => {
 // Get team performance
 router.get('/team-performance', auth, requireAdmin, async (req, res) => {
   try {
-    const [teamData] = await pool.execute(`
+    const [teamData] = await pool.query(`
       SELECT 
         u.name,
         COUNT(l.id) as leads,
@@ -626,7 +626,7 @@ router.get('/team-performance', auth, requireAdmin, async (req, res) => {
 // Get payment history
 router.get('/payment-history', auth, requireAdmin, async (req, res) => {
   try {
-    const [payments] = await pool.execute(`
+    const [payments] = await pool.query(`
       SELECT 
         p.id,
         u.name as user,
@@ -650,7 +650,7 @@ router.get('/payment-history', auth, requireAdmin, async (req, res) => {
 // Get user activity
 router.get('/user-activity', auth, requireAdmin, async (req, res) => {
   try {
-    const [activity] = await pool.execute(`
+    const [activity] = await pool.query(`
       SELECT 
         al.user_id,
         u.name as user_name,
@@ -673,7 +673,7 @@ router.get('/user-activity', auth, requireAdmin, async (req, res) => {
 // Get blocked users
 router.get('/blocked-users', auth, requireAdmin, async (req, res) => {
   try {
-    const [blockedUsers] = await pool.execute(`
+    const [blockedUsers] = await pool.query(`
       SELECT 
         id,
         name,
@@ -715,7 +715,7 @@ router.post('/block-user/:id', auth, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     
-    await pool.execute(`
+    await pool.query(`
       UPDATE users 
       SET isActive = 0, updatedAt = NOW()
       WHERE id = ?
@@ -733,7 +733,7 @@ router.post('/unblock-user/:id', auth, requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     
-    await pool.execute(`
+    await pool.query(`
       UPDATE users 
       SET isActive = 1, updatedAt = NOW()
       WHERE id = ?
@@ -749,7 +749,7 @@ router.post('/unblock-user/:id', auth, requireAdmin, async (req, res) => {
 // Get expiry alerts
 router.get('/expiry-alerts', auth, requireAdmin, async (req, res) => {
   try {
-    const [rows] = await pool.execute(`
+    const rows = await pool.query(`
       SELECT 
         up.id,
         u.id as user_id,
@@ -787,7 +787,7 @@ router.post('/users/:id/renew-package', auth, requireAdmin, async (req, res) => 
     const { package_name, renewal_months = 12, amount } = req.body;
 
     // Get package details
-    const [packageResult] = await pool.execute(
+    const [packageResult] = await pool.query(
       'SELECT id, name, price FROM packages WHERE name = ?',
       [package_name]
     );
@@ -799,7 +799,7 @@ router.post('/users/:id/renew-package', auth, requireAdmin, async (req, res) => 
     const packageId = packageResult[0].id;
 
     // Get current user package
-    const [currentPackageResult] = await pool.execute(
+    const [currentPackageResult] = await pool.query(
       'SELECT * FROM user_packages WHERE user_id = ? AND status = "active" ORDER BY created_at DESC LIMIT 1',
       [id]
     );
@@ -816,19 +816,19 @@ router.post('/users/:id/renew-package', auth, requireAdmin, async (req, res) => 
     newExpiry.setMonth(newExpiry.getMonth() + renewal_months);
 
     // Update the existing package record
-    await pool.execute(
+    await pool.query(
       'UPDATE user_packages SET end_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
       [newExpiry, currentPackage.id]
     );
 
     // Create payment record
-    await pool.execute(
+    await pool.query(
       'INSERT INTO payments (user_id, package_id, amount, status, payment_method, transaction_id) VALUES (?, ?, ?, "completed", "admin_renewal", ?)',
       [id, packageId, amount, `RENEW_${Date.now()}`]
     );
 
     // Log the activity
-    await pool.execute(
+    await pool.query(
       'INSERT INTO activity_logs (user_id, action, description, ip_address) VALUES (?, "PACKAGE_RENEWED", ?, ?)',
       [req.user.id, `Renewed ${package_name} package for user ID ${id}`, req.ip]
     );
@@ -849,7 +849,7 @@ router.post('/users/:id/renew-package', auth, requireAdmin, async (req, res) => 
 // Get company messages
 router.get('/messages', auth, requireAdmin, async (req, res) => {
   try {
-    const [rows] = await pool.execute(`
+    const rows = await pool.query(`
       SELECT 
         m.id,
         u.name as user_name,
@@ -919,7 +919,7 @@ router.post('/messages', auth, requireAdmin, async (req, res) => {
     }
 
     // Create new message record
-    const [result] = await pool.execute(
+    const result = await pool.query(
       'INSERT INTO messages (user_id, recipient, subject, content, type, status, created_at) VALUES (?, ?, ?, ?, ?, "sent", CURRENT_TIMESTAMP)',
       [req.user.id, recipient, subject, content, type]
     );
@@ -927,7 +927,7 @@ router.post('/messages', auth, requireAdmin, async (req, res) => {
     const messageId = result.insertId;
 
     // Log the activity
-    await pool.execute(
+    await pool.query(
       'INSERT INTO activity_logs (user_id, action, description, ip_address) VALUES (?, "MESSAGE_SENT", ?, ?)',
       [req.user.id, `Sent new ${type} message to ${recipient}: ${subject}`, req.ip]
     );
@@ -953,7 +953,7 @@ router.post('/messages/:id/resend', auth, requireAdmin, async (req, res) => {
     const { recipient, subject, content, type } = req.body;
 
     // Get original message details
-    const [messageResult] = await pool.execute(
+    const [messageResult] = await pool.query(
       'SELECT * FROM messages WHERE id = ?',
       [id]
     );
@@ -965,13 +965,13 @@ router.post('/messages/:id/resend', auth, requireAdmin, async (req, res) => {
     const originalMessage = messageResult[0];
 
     // Create new message record (resend)
-    await pool.execute(
+    await pool.query(
       'INSERT INTO messages (user_id, recipient, subject, content, type, status, created_at) VALUES (?, ?, ?, ?, ?, "sent", CURRENT_TIMESTAMP)',
       [req.user.id, recipient || originalMessage.recipient, subject || originalMessage.subject, content || originalMessage.content, type || originalMessage.type]
     );
 
     // Log the activity
-    await pool.execute(
+    await pool.query(
       'INSERT INTO activity_logs (user_id, action, description, ip_address) VALUES (?, "MESSAGE_RESENT", ?, ?)',
       [req.user.id, `Resent message ID ${id} to ${recipient || originalMessage.recipient}`, req.ip]
     );
@@ -994,7 +994,7 @@ router.delete('/messages/:id', auth, requireAdmin, async (req, res) => {
     const { id } = req.params;
 
     // Get message details before deletion
-    const [messageResult] = await pool.execute(
+    const [messageResult] = await pool.query(
       'SELECT * FROM messages WHERE id = ?',
       [id]
     );
@@ -1006,13 +1006,13 @@ router.delete('/messages/:id', auth, requireAdmin, async (req, res) => {
     const message = messageResult[0];
 
     // Delete the message
-    await pool.execute(
+    await pool.query(
       'DELETE FROM messages WHERE id = ?',
       [id]
     );
 
     // Log the activity
-    await pool.execute(
+    await pool.query(
       'INSERT INTO activity_logs (user_id, action, description, ip_address) VALUES (?, "MESSAGE_DELETED", ?, ?)',
       [req.user.id, `Deleted message ID ${id} (${message.subject})`, req.ip]
     );
