@@ -1,5 +1,4 @@
 import express from 'express';
-
 import db from '../config/db.js';
 
 const router = express.Router();
@@ -22,7 +21,7 @@ router.get('/', async (req, res) => {
     
     console.log('Query:', query);
     
-    const [invoices] = await db.execute(query);
+    const [invoices] = await db.query(query);
     console.log('✅ Found invoices:', invoices.length);
     
     res.json({
@@ -51,7 +50,7 @@ router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
-    const [invoices] = await db.execute(`
+    const [invoices] = await db.query(`
       SELECT 
         i.*,
         '[]' as activities,
@@ -59,7 +58,7 @@ router.get('/:id', async (req, res) => {
         '[]' as payment_history,
         '[]' as files
       FROM invoices i
-      WHERE i.id = ? OR i.invoice_id = ?
+      WHERE i.id = $1 OR i.invoice_id = $1
     `, [id, id]);
 
     if (invoices.length === 0) {
@@ -92,12 +91,12 @@ router.post('/', async (req, res) => {
       stage = 'New'
     } = req.body;
 
-    const [result] = await db.execute(`
+    const [result] = await db.query(`
       INSERT INTO invoices (
         invoice_id, client_name, client_email, client_address, client_phone, 
         date, due_date, status, line_items, total, notes, 
         pipeline, stage, assigned_to, priority, tags
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES ($1, $1, $1, $1, $1, $1, $1, $1, $1, $1, $1, $1, $1, $1, $1, $1)
     `, [
       invoice_id, client_name, client_email, '', '', 
       new Date().toISOString().split('T')[0], due_date, status, 
@@ -136,22 +135,22 @@ router.put('/:id', async (req, res) => {
 
     console.log('Updating invoice ID:', id, 'with data:', req.body);
 
-    const [result] = await db.execute(`
+    const [result] = await db.query(`
       UPDATE invoices 
       SET 
-        invoice_id = ?,
-        client_name = ?,
-        client_email = ?,
-        total = ?,
-        status = ?,
-        due_date = ?,
-        notes = ?,
-        assigned_to = ?,
-        priority = ?,
-        pipeline = ?,
-        stage = ?,
+        invoice_id = $1,
+        client_name = $1,
+        client_email = $1,
+        total = $1,
+        status = $1,
+        due_date = $1,
+        notes = $1,
+        assigned_to = $1,
+        priority = $1,
+        pipeline = $1,
+        stage = $1,
         updated_at = NOW()
-      WHERE id = ?
+      WHERE id = $1
     `, [
       invoice_id, client_name, client_email, total, status,
       due_date, description, assigned_to, priority, pipeline, stage, id
@@ -175,7 +174,7 @@ router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
 
-    const [result] = await db.execute('DELETE FROM invoices WHERE id = ?', [id]);
+    const [result] = await db.query('DELETE FROM invoices WHERE id = $1', [id]);
 
     if (result.affectedRows === 0) {
       return res.status(404).json({ success: false, message: 'Invoice not found' });
@@ -194,10 +193,10 @@ router.patch('/:id/mark-paid', async (req, res) => {
   try {
     const { id } = req.params;
 
-    const [result] = await db.execute(`
+    const [result] = await db.query(`
       UPDATE invoices 
       SET status = 'Paid', updated_at = NOW() 
-      WHERE id = ?
+      WHERE id = $1
     `, [id]);
 
     if (result.affectedRows === 0) {
@@ -215,7 +214,7 @@ router.patch('/:id/mark-paid', async (req, res) => {
 // Get invoice statistics
 router.get('/stats/overview', async (req, res) => {
   try {
-    const [stats] = await db.execute(`
+    const [stats] = await db.query(`
       SELECT 
         COUNT(*) as total,
         SUM(CASE WHEN status = 'Paid' THEN 1 ELSE 0 END) as paid,
