@@ -7,13 +7,13 @@ const router = express.Router();
 // GET /api/tasks - fetch all tasks for the authenticated user
 router.get('/', auth, async (req, res) => {
   try {
-    const [tasks] = await pool.execute(`
+    const tasks = await pool.query(`
       SELECT t.*, u.name as assigned_user_name, u.email as assigned_user_email, 
              a.name as assigned_by_name, a.email as assigned_by_email
       FROM tasks t 
       LEFT JOIN users u ON t.user_id = u.id 
       LEFT JOIN users a ON t.assigned_by = a.id
-      WHERE t.user_id = ? 
+      WHERE t.user_id = $1 
       ORDER BY t.due_date ASC, t.createdAt DESC
     `, [req.user.id]);
     res.json({ tasks });
@@ -26,7 +26,7 @@ router.get('/', auth, async (req, res) => {
 // GET /api/tasks/all - fetch all tasks without user filtering
 router.get('/all', auth, async (req, res) => {
   try {
-    const [tasks] = await pool.execute('SELECT * FROM tasks ORDER BY due_date ASC, createdAt DESC');
+    const tasks = await pool.query('SELECT * FROM tasks ORDER BY due_date ASC, createdAt DESC');
     res.json({ tasks });
   } catch (error) {
     console.error('Get all tasks error:', error);
@@ -47,14 +47,14 @@ router.post('/', auth, async (req, res) => {
     let userId = req.user.id;
     if (assigned_to && req.user.role === 'admin') {
       // Admin can assign tasks to any user
-      const [users] = await pool.execute('SELECT id, role FROM users WHERE id = ?', [assigned_to]);
+      const users = await pool.query('SELECT id, role FROM users WHERE id = $1', [assigned_to]);
       if (users.length === 0) {
         return res.status(400).json({ message: 'Assigned user not found' });
       }
       userId = assigned_to;
     } else if (assigned_to && req.user.role === 'manager') {
       // Manager can assign tasks to employees
-      const [users] = await pool.execute('SELECT id, role FROM users WHERE id = ? AND role = "employee"', [assigned_to]);
+      const users = await pool.query('SELECT id, role FROM users WHERE id = $1 AND role = "employee"', [assigned_to]);
       if (users.length === 0) {
         return res.status(400).json({ message: 'Can only assign tasks to employees' });
       }
@@ -63,19 +63,19 @@ router.post('/', auth, async (req, res) => {
     
     console.log('Inserting task with userId:', userId);
     
-    const [result] = await pool.execute(
-      'INSERT INTO tasks (title, description, due_date, user_id, type, assigned_by) VALUES (?, ?, ?, ?, ?, ?)',
+    const result = await pool.query(
+      'INSERT INTO tasks (title, description, due_date, user_id, type, assigned_by) VALUES ($1, $1, $1, $1, $1, $1)',
       [title, description || '', due_date || null, userId, type || 'Follow up', req.user.id]
     );
     
     console.log('Task inserted with ID:', result.insertId);
     
     // Return the created task with user details
-    const [newTask] = await pool.execute(`
+    const newTask = await pool.query(`
       SELECT t.*, u.name as assigned_user_name, u.email as assigned_user_email 
       FROM tasks t 
       LEFT JOIN users u ON t.user_id = u.id 
-      WHERE t.id = ?
+      WHERE t.id = $1
     `, [result.insertId]);
     res.status(201).json(newTask[0]);
   } catch (error) {
@@ -94,11 +94,11 @@ router.get('/assignable-users', auth, async (req, res) => {
     
     if (req.user.role === 'admin') {
       // Admin can assign to managers and employees except themselves
-      query += ' AND role IN ("manager", "employee") AND id != ?';
+      query += ' AND role IN ("manager", "employee") AND id != $1';
       params.push(req.user.id);
     } else if (req.user.role === 'manager') {
       // Manager can assign to employees only
-      query += ' AND role = "employee" AND id != ?';
+      query += ' AND role = "employee" AND id != $1';
       params.push(req.user.id);
     } else {
       // Employees cannot assign tasks
@@ -109,9 +109,9 @@ router.get('/assignable-users', auth, async (req, res) => {
     console.log('Query:', query);
     console.log('Params:', params);
     
-    const [users] = await pool.execute(query, params);
-    console.log('Found users:', users);
-    res.json(users);
+    const users = await pool.query(query, params);
+    console.log('Found users:', users.rows);
+    res.json(users.rows);
   } catch (error) {
     console.error('Get assignable users error:', error);
     res.status(500).json({ message: 'Server error' });
@@ -130,13 +130,13 @@ router.get('/calendar/:userId', auth, async (req, res) => {
     
     // Admin and managers can view any user's calendar
     // Employees can only view their own calendar
-    const [tasks] = await pool.execute(`
+    const tasks = await pool.query(`
       SELECT t.*, u.name as assigned_user_name, u.email as assigned_user_email,
              a.name as assigned_by_name, a.email as assigned_by_email
       FROM tasks t 
       LEFT JOIN users u ON t.user_id = u.id 
       LEFT JOIN users a ON t.assigned_by = a.id
-      WHERE t.user_id = ? 
+      WHERE t.user_id = $1 
       ORDER BY t.due_date ASC, t.createdAt DESC
     `, [userId]);
     
@@ -158,7 +158,7 @@ router.put('/:id/status', auth, async (req, res) => {
     }
     
     // Check if user owns this task or is admin/manager
-    const [task] = await pool.execute('SELECT user_id FROM tasks WHERE id = ?', [id]);
+    const task = await pool.query('SELECT user_id FROM tasks WHERE id = $1', [id]);
     if (task.length === 0) {
       return res.status(404).json({ message: 'Task not found' });
     }
@@ -167,7 +167,7 @@ router.put('/:id/status', auth, async (req, res) => {
       return res.status(403).json({ message: 'Access denied' });
     }
     
-    await pool.execute('UPDATE tasks SET status = ?, updatedAt = NOW() WHERE id = ?', [status, id]);
+    await pool.query('UPDATE tasks SET status = $1, updatedAt = NOW() WHERE id = $1', [status, id]);
     
     res.json({ message: 'Task status updated successfully' });
   } catch (error) {
@@ -182,7 +182,7 @@ router.delete('/:id', auth, async (req, res) => {
     const { id } = req.params;
     
     // Check if user owns this task or is admin/manager
-    const [task] = await pool.execute('SELECT user_id, assigned_by FROM tasks WHERE id = ?', [id]);
+    const task = await pool.query('SELECT user_id, assigned_by FROM tasks WHERE id = $1', [id]);
     if (task.length === 0) {
       return res.status(404).json({ message: 'Task not found' });
     }
@@ -196,7 +196,7 @@ router.delete('/:id', auth, async (req, res) => {
       return res.status(403).json({ message: 'Access denied' });
     }
     
-    await pool.execute('DELETE FROM tasks WHERE id = ?', [id]);
+    await pool.query('DELETE FROM tasks WHERE id = $1', [id]);
     
     res.json({ message: 'Task deleted successfully' });
   } catch (error) {
