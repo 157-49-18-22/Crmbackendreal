@@ -39,7 +39,7 @@ router.post('/register', [
     }
 
     // Check if user already exists
-    const [existingUsers] = await pool.execute(
+    const [existingUsers] = await pool.query(
       'SELECT id FROM users WHERE email = ?',
       [email]
     );
@@ -54,13 +54,13 @@ router.post('/register', [
 
     // Create new user
     const result = await pool.query(
-      'INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, $4) RETURNING id',
+      'INSERT INTO users (name, email, password, role) VALUES (?, $2, $3, $4) RETURNING id',
       [name, email, hashedPassword, role]
     );
 
     // Get the created user
     const users = await pool.query(
-      'SELECT id, name, email, role, avatar, isActive, createdAt FROM users WHERE id = $1',
+      'SELECT id, name, email, role, avatar, isActive, createdAt FROM users WHERE id = ?',
       [result.rows[0].id]
     );
 
@@ -98,7 +98,7 @@ router.post('/login', [
 
     // Check if user exists
     const users = await pool.query(
-      'SELECT * FROM users WHERE email = $1',
+      'SELECT * FROM users WHERE email = ?',
       [email]
     );
     console.log('User lookup result:', users.rows);
@@ -170,7 +170,7 @@ router.post('/refresh', async (req, res) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
     // Check if user still exists
-    const [users] = await pool.execute(
+    const [users] = await pool.query(
       'SELECT id, name, email, role, avatar, isActive FROM users WHERE id = ?',
       [decoded.userId]
     );
@@ -205,7 +205,7 @@ router.get('/me', async (req, res) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
-    const [users] = await pool.execute(
+    const [users] = await pool.query(
       'SELECT id, name, email, role, avatar, isActive, createdAt FROM users WHERE id = ?',
       [decoded.userId]
     );
@@ -243,7 +243,7 @@ router.put('/profile', [
     const { name, email, avatar } = req.body;
 
     // Check if email is already taken by another user
-    const [existingUsers] = await pool.execute(
+    const [existingUsers] = await pool.query(
       'SELECT id FROM users WHERE email = ? AND id != ?',
       [email, decoded.userId]
     );
@@ -253,13 +253,13 @@ router.put('/profile', [
     }
 
     // Update user
-    await pool.execute(
+    await pool.query(
       'UPDATE users SET name = ?, email = ?, avatar = ? WHERE id = ?',
       [name, email, avatar || '', decoded.userId]
     );
 
     // Get updated user
-    const [users] = await pool.execute(
+    const [users] = await pool.query(
       'SELECT id, name, email, role, avatar, isActive, createdAt FROM users WHERE id = ?',
       [decoded.userId]
     );
