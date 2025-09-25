@@ -167,19 +167,19 @@ router.post('/', auth, [
       expectedCloseDate = null
     } = req.body;
     const result = await pool.query(
-      `INSERT INTO leads (name, amount, stage, pipeline, contact_name, contact_phone, contact_email, contact_position, company_name, company_address, assigned_to, created_by, source, priority, expected_close_date) VALUES ($1, $1, $1, $1, $1, $1, $1, $1, $1, $1, $1, $1, $1, $1, $1)`,
+      `INSERT INTO leads (name, amount, stage, pipeline, contact_name, contact_phone, contact_email, contact_position, company_name, company_address, assigned_to, created_by, source, priority, expected_close_date) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
       [name, amount, stage, pipeline, contactName, contactPhone, contactEmail, contactPosition, companyName, companyAddress, req.user.id, req.user.id, source, priority, expectedCloseDate]
     );
     const leads = await pool.query(
       `SELECT * FROM leads WHERE id = $1`,
-      [result.insertId]
+      [result.rows[0].id]
     );
     res.status(201).json(leads.rows[0]);
     
     // Log lead creation activity
     await activityLogger.logLeadCreated(
       req.user.id, 
-      result.insertId, 
+      result.rows[0].id, 
       name, 
       source || 'Manual', 
       stage
@@ -565,7 +565,7 @@ router.get('/stats/win-loss', auth, async (req, res) => {
     ];
     
     const formattedStages = pipelineStages.map(stageName => {
-      const stageData = stageAnalysis.find(s => s.stage === stageName) || {
+      const stageData = stageAnalysis.rows.find(s => s.stage === stageName) || {
         currentLeads: 0,
         currentAmount: 0,
         wonCount: 0,
@@ -574,7 +574,7 @@ router.get('/stats/win-loss', auth, async (req, res) => {
         lostAmount: 0
       };
       
-      const transitionData = stageTransitions.find(s => s.stage === stageName) || { enteredCount: 0 };
+      const transitionData = stageTransitions.rows.find(s => s.stage === stageName) || { enteredCount: 0 };
       
       return {
         name: stageName,
