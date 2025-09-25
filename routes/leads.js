@@ -30,19 +30,19 @@ router.get('/all', auth, async (req, res) => {
     let params = [];
     
     if (pipeline) {
-      where += ' AND pipeline = ?';
+      where += ' AND pipeline = $1';
       params.push(pipeline);
     }
     if (stage) {
-      where += ' AND stage = ?';
+      where += ' AND stage = $1';
       params.push(stage);
     }
     if (status) {
-      where += ' AND status = ?';
+      where += ' AND status = $1';
       params.push(status);
     }
     if (search) {
-      where += ' AND (name LIKE ? OR contact_name LIKE ? OR company_name LIKE ?)';
+      where += ' AND (name LIKE $1 OR contact_name LIKE $1 OR company_name LIKE $1)';
       params.push(`%${search}%`, `%${search}%`, `%${search}%`);
     }
     
@@ -74,22 +74,22 @@ router.get('/', auth, async (req, res) => {
     const limitNum = parseInt(limit, 10) || 10;
     const pageNum = parseInt(page, 10) || 1;
     const offsetNum = (pageNum - 1) * limitNum;
-    let where = 'WHERE assigned_to = ?';
+    let where = 'WHERE assigned_to = $1';
     let params = [req.user.id];
     if (pipeline) {
-      where += ' AND pipeline = ?';
+      where += ' AND pipeline = $1';
       params.push(pipeline);
     }
     if (stage) {
-      where += ' AND stage = ?';
+      where += ' AND stage = $1';
       params.push(stage);
     }
     if (status) {
-      where += ' AND status = ?';
+      where += ' AND status = $1';
       params.push(status);
     }
     if (search) {
-      where += ' AND (name LIKE ? OR contact_name LIKE ? OR company_name LIKE ?)';
+      where += ' AND (name LIKE $1 OR contact_name LIKE $1 OR company_name LIKE $1)';
       params.push(`%${search}%`, `%${search}%`, `%${search}%`);
     }
     const leads = await pool.query(
@@ -117,7 +117,7 @@ router.get('/', auth, async (req, res) => {
 router.get('/:id', auth, async (req, res) => {
   try {
     const leads = await pool.query(
-      `SELECT * FROM leads WHERE id = ?`,
+      `SELECT * FROM leads WHERE id = $1`,
       [req.params.id]
     );
     if (leads.rows.length === 0) {
@@ -129,7 +129,7 @@ router.get('/:id', auth, async (req, res) => {
     }
     // Get notes
     const notes = await pool.query(
-      `SELECT n.*, u.name as created_by_name FROM notes n LEFT JOIN users u ON n.created_by = u.id WHERE n.lead_id = ? ORDER BY n.createdAt DESC`,
+      `SELECT n.*, u.name as created_by_name FROM notes n LEFT JOIN users u ON n.created_by = u.id WHERE n.lead_id = $1 ORDER BY n.createdAt DESC`,
       [lead.id]
     );
     lead.notes = notes.rows;
@@ -167,11 +167,11 @@ router.post('/', auth, [
       expectedCloseDate = null
     } = req.body;
     const result = await pool.query(
-      `INSERT INTO leads (name, amount, stage, pipeline, contact_name, contact_phone, contact_email, contact_position, company_name, company_address, assigned_to, created_by, source, priority, expected_close_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO leads (name, amount, stage, pipeline, contact_name, contact_phone, contact_email, contact_position, company_name, company_address, assigned_to, created_by, source, priority, expected_close_date) VALUES ($1, $1, $1, $1, $1, $1, $1, $1, $1, $1, $1, $1, $1, $1, $1)`,
       [name, amount, stage, pipeline, contactName, contactPhone, contactEmail, contactPosition, companyName, companyAddress, req.user.id, req.user.id, source, priority, expectedCloseDate]
     );
     const leads = await pool.query(
-      `SELECT * FROM leads WHERE id = ?`,
+      `SELECT * FROM leads WHERE id = $1`,
       [result.insertId]
     );
     res.status(201).json(leads.rows[0]);
@@ -199,7 +199,7 @@ router.put('/:id', auth, async (req, res) => {
   
   try {
     const leads = await pool.query(
-      `SELECT * FROM leads WHERE id = ?`,
+      `SELECT * FROM leads WHERE id = $1`,
       [req.params.id]
     );
     if (leads.rows.length === 0) {
@@ -246,12 +246,12 @@ router.put('/:id', auth, async (req, res) => {
         console.log(`Current value: "${currentValue}", New value: "${value}"`);
         
         // Handle null/undefined current values properly
-        const normalizedCurrentValue = currentValue === null || currentValue === undefined ? '' : String(currentValue);
-        const normalizedNewValue = value === null || value === undefined ? '' : String(value);
+        const normalizedCurrentValue = currentValue === null || currentValue === undefined $1 '' : String(currentValue);
+        const normalizedNewValue = value === null || value === undefined $1 '' : String(value);
         
         if (normalizedCurrentValue !== normalizedNewValue) {
           console.log(`Values are different, adding to updates`);
-          updates.push(`${backendField} = ?`);
+          updates.push(`${backendField} = $1`);
           params.push(value);
         } else {
           console.log(`Field ${backendField} unchanged: "${currentValue}" -> "${value}"`);
@@ -274,11 +274,11 @@ router.put('/:id', auth, async (req, res) => {
     console.log('Updating lead with:', { updates, params, leadId: req.params.id });
     params.push(req.params.id);
     await pool.query(
-      `UPDATE leads SET ${updates.join(', ')} WHERE id = ?`,
+      `UPDATE leads SET ${updates.join(', ')} WHERE id = $1`,
       params
     );
     const updatedLeads = await pool.query(
-      `SELECT * FROM leads WHERE id = ?`,
+      `SELECT * FROM leads WHERE id = $1`,
       [req.params.id]
     );
     res.json(updatedLeads.rows[0]);
@@ -305,7 +305,7 @@ router.patch('/:id/stage', auth, async (req, res) => {
   const { stage } = req.body;
   try {
     const leads = await pool.query(
-      `SELECT * FROM leads WHERE id = ?`,
+      `SELECT * FROM leads WHERE id = $1`,
       [id]
     );
     if (leads.rows.length === 0) {
@@ -316,7 +316,7 @@ router.patch('/:id/stage', auth, async (req, res) => {
       return res.status(403).json({ message: 'Access denied' });
     }
     await pool.query(
-      `UPDATE leads SET stage = ? WHERE id = ?`,
+      `UPDATE leads SET stage = $1 WHERE id = $1`,
       [stage, id]
     );
     
@@ -340,7 +340,7 @@ router.patch('/:id/stage', auth, async (req, res) => {
 router.delete('/:id', auth, async (req, res) => {
   try {
     const leads = await pool.query(
-      `SELECT * FROM leads WHERE id = ?`,
+      `SELECT * FROM leads WHERE id = $1`,
       [req.params.id]
     );
     if (leads.rows.length === 0) {
@@ -351,7 +351,7 @@ router.delete('/:id', auth, async (req, res) => {
       return res.status(403).json({ message: 'Access denied' });
     }
     await pool.query(
-      `DELETE FROM leads WHERE id = ?`,
+      `DELETE FROM leads WHERE id = $1`,
       [req.params.id]
     );
     res.json({ message: 'Lead removed' });
@@ -371,7 +371,7 @@ router.post('/:id/notes', auth, [
       return res.status(400).json({ errors: errors.array() });
     }
     const leads = await pool.query(
-      `SELECT * FROM leads WHERE id = ?`,
+      `SELECT * FROM leads WHERE id = $1`,
       [req.params.id]
     );
     if (leads.rows.length === 0) {
@@ -382,12 +382,12 @@ router.post('/:id/notes', auth, [
       return res.status(403).json({ message: 'Access denied' });
     }
     await pool.query(
-      `INSERT INTO notes (lead_id, content, created_by) VALUES (?, ?, ?)`,
+      `INSERT INTO notes (lead_id, content, created_by) VALUES ($1, $1, $1)`,
       [req.params.id, req.body.content, req.user.id]
     );
     // Return updated notes
     const notes = await pool.query(
-      `SELECT n.*, u.name as created_by_name FROM notes n LEFT JOIN users u ON n.created_by = u.id WHERE n.lead_id = ? ORDER BY n.createdAt DESC`,
+      `SELECT n.*, u.name as created_by_name FROM notes n LEFT JOIN users u ON n.created_by = u.id WHERE n.lead_id = $1 ORDER BY n.createdAt DESC`,
       [req.params.id]
     );
     res.json(notes.rows);
@@ -408,7 +408,7 @@ router.patch('/:id/stage', auth, [
     }
     
     const leads = await pool.query(
-      `SELECT * FROM leads WHERE id = ?`,
+      `SELECT * FROM leads WHERE id = $1`,
       [req.params.id]
     );
     if (leads.rows.length === 0) {
@@ -425,13 +425,13 @@ router.patch('/:id/stage', auth, [
     
     // Update the lead stage
     await pool.query(
-      `UPDATE leads SET stage = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?`,
+      `UPDATE leads SET stage = $1, updatedAt = CURRENT_TIMESTAMP WHERE id = $1`,
       [newStage, req.params.id]
     );
     
     // Log the stage change activity
     await pool.query(
-      `INSERT INTO activity_logs (user_id, object_type, object_id, object_name, event_type, event_description, value_before, value_after, impact, priority) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO activity_logs (user_id, object_type, object_id, object_name, event_type, event_description, value_before, value_after, impact, priority) VALUES ($1, $1, $1, $1, $1, $1, $1, $1, $1, $1)`,
       [
         req.user.id,
         'Lead',
@@ -456,7 +456,7 @@ router.patch('/:id/stage', auth, [
 // GET /api/leads/stats/overview - Get lead statistics
 router.get('/stats/overview', auth, async (req, res) => {
   try {
-    let where = 'WHERE assigned_to = ?';
+    let where = 'WHERE assigned_to = $1';
     let params = [req.user.id];
     const stats = await pool.query(
       `SELECT stage, COUNT(*) as count, SUM(amount) as totalAmount FROM leads ${where} GROUP BY stage`,
@@ -489,7 +489,7 @@ router.get('/stats/overview', auth, async (req, res) => {
 // GET /api/leads/stats/win-loss - Get win-loss analysis data
 router.get('/stats/win-loss', auth, async (req, res) => {
   try {
-    let where = 'WHERE assigned_to = ?';
+    let where = 'WHERE assigned_to = $1';
     let params = [req.user.id];
     
     // Get total new leads (leads created in the last 30 days)
