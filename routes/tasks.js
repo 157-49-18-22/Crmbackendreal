@@ -89,7 +89,7 @@ router.get('/assignable-users', auth, async (req, res) => {
   try {
     console.log('Getting assignable users for user:', req.user);
     
-    let query = 'SELECT id, name, email, role FROM users WHERE (isActive = 1 OR isActive IS NULL)';
+    let query = 'SELECT id, name, email, role FROM users WHERE (isActive = true OR isActive IS NULL)';
     let params = [];
     
     if (req.user.role === 'admin') {
