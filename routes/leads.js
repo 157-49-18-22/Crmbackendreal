@@ -167,9 +167,16 @@ router.post('/', auth, [
       expectedCloseDate = null
     } = req.body;
     const result = await pool.query(
-      `INSERT INTO leads (name, amount, stage, pipeline, contact_name, contact_phone, contact_email, contact_position, company_name, company_address, assigned_to, created_by, source, priority, expected_close_date) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+      `INSERT INTO leads (name, amount, stage, pipeline, contact_name, contact_phone, contact_email, contact_position, company_name, company_address, assigned_to, created_by, source, priority, expected_close_date) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) RETURNING id`,
       [name, amount, stage, pipeline, contactName, contactPhone, contactEmail, contactPosition, companyName, companyAddress, req.user.id, req.user.id, source, priority, expectedCloseDate]
     );
+    console.log('Insert result:', result);
+    console.log('Insert result rows:', result.rows);
+    
+    if (!result.rows || result.rows.length === 0) {
+      throw new Error('Failed to create lead - no ID returned');
+    }
+    
     const leads = await pool.query(
       `SELECT * FROM leads WHERE id = $1`,
       [result.rows[0].id]
