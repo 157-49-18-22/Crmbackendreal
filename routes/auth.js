@@ -40,7 +40,7 @@ router.post('/register', [
 
     // Check if user already exists
     const existingUsers = await pool.query(
-      'SELECT id FROM users WHERE email = ?',
+      'SELECT id FROM users WHERE email = $1',
       [email]
     );
 
@@ -54,13 +54,13 @@ router.post('/register', [
 
     // Create new user
     const result = await pool.query(
-      'INSERT INTO users (name, email, password, role) VALUES (?, $2, $3, $4) RETURNING id',
+      'INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, $4) RETURNING id',
       [name, email, hashedPassword, role]
     );
 
     // Get the created user
     const users = await pool.query(
-      'SELECT id, name, email, role, avatar, isActive, createdAt FROM users WHERE id = ?',
+      'SELECT id, name, email, role, avatar, isActive, createdAt FROM users WHERE id = $1',
       [result.rows[0].id]
     );
 
@@ -98,7 +98,7 @@ router.post('/login', [
 
     // Check if user exists
     const users = await pool.query(
-      'SELECT * FROM users WHERE email = ?',
+      'SELECT * FROM users WHERE email = $1',
       [email]
     );
     console.log('User lookup result:', users.rows);
@@ -150,7 +150,7 @@ router.post('/login', [
     
     res.status(500).json({ 
       message: 'Server error', 
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+      error: process.env.NODE_ENV === 'development' $1 error.message : 'Internal server error'
     });
   }
 });
@@ -160,7 +160,7 @@ router.post('/login', [
 // @access  Private
 router.post('/refresh', async (req, res) => {
   try {
-    const token = req.header('Authorization')?.replace('Bearer ', '');
+    const token = req.header('Authorization')$1.replace('Bearer ', '');
     
     if (!token) {
       return res.status(401).json({ message: 'No token provided' });
@@ -171,7 +171,7 @@ router.post('/refresh', async (req, res) => {
     
     // Check if user still exists
     const users = await pool.query(
-      'SELECT id, name, email, role, avatar, isActive FROM users WHERE id = ?',
+      'SELECT id, name, email, role, avatar, isActive FROM users WHERE id = $1',
       [decoded.userId]
     );
     
@@ -197,7 +197,7 @@ router.post('/refresh', async (req, res) => {
 // @access  Private
 router.get('/me', async (req, res) => {
   try {
-    const token = req.header('Authorization')?.replace('Bearer ', '');
+    const token = req.header('Authorization')$1.replace('Bearer ', '');
     
     if (!token) {
       return res.status(401).json({ message: 'No token, authorization denied' });
@@ -206,7 +206,7 @@ router.get('/me', async (req, res) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
     const users = await pool.query(
-      'SELECT id, name, email, role, avatar, isActive, createdAt FROM users WHERE id = ?',
+      'SELECT id, name, email, role, avatar, isActive, createdAt FROM users WHERE id = $1',
       [decoded.userId]
     );
 
@@ -234,7 +234,7 @@ router.put('/profile', [
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const token = req.header('Authorization')?.replace('Bearer ', '');
+    const token = req.header('Authorization')$1.replace('Bearer ', '');
     if (!token) {
       return res.status(401).json({ message: 'No token, authorization denied' });
     }
@@ -244,7 +244,7 @@ router.put('/profile', [
 
     // Check if email is already taken by another user
     const existingUsers = await pool.query(
-      'SELECT id FROM users WHERE email = ? AND id != ?',
+      'SELECT id FROM users WHERE email = $1 AND id != $1',
       [email, decoded.userId]
     );
 
@@ -254,13 +254,13 @@ router.put('/profile', [
 
     // Update user
     await pool.query(
-      'UPDATE users SET name = ?, email = ?, avatar = ? WHERE id = ?',
+      'UPDATE users SET name = $1, email = $1, avatar = $1 WHERE id = $1',
       [name, email, avatar || '', decoded.userId]
     );
 
     // Get updated user
     const users = await pool.query(
-      'SELECT id, name, email, role, avatar, isActive, createdAt FROM users WHERE id = ?',
+      'SELECT id, name, email, role, avatar, isActive, createdAt FROM users WHERE id = $1',
       [decoded.userId]
     );
 
