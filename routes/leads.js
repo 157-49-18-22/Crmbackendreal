@@ -465,27 +465,67 @@ router.get('/stats/overview', auth, async (req, res) => {
   try {
     let where = 'WHERE assigned_to = $1';
     let params = [req.user.id];
+    
+    // Get stage statistics
     const stats = await pool.query(
       `SELECT stage, COUNT(*) as count, SUM(amount) as totalAmount FROM leads ${where} GROUP BY stage`,
       params
     );
+    
+    // Get status statistics (won, lost, active)
     const statusStats = await pool.query(
-      `SELECT stage as status, COUNT(*) as count FROM leads ${where} GROUP BY stage`,
+      `SELECT 
+        CASE 
+          WHEN stage = 'won' THEN 'won'
+          WHEN stage = 'lost' THEN 'lost'
+          ELSE 'active'
+        END as status, 
+        COUNT(*) as count 
+       FROM leads ${where} 
+       GROUP BY 
+         CASE 
+           WHEN stage = 'won' THEN 'won'
+           WHEN stage = 'lost' THEN 'lost'
+           ELSE 'active'
+         END`,
       params
     );
+    
+    // Get total leads count
     const totalLeadsRow = await pool.query(
       `SELECT COUNT(*) as totalLeads FROM leads ${where}`,
       params
     );
+    
+    // Get total amount
     const totalAmountRow = await pool.query(
       `SELECT SUM(amount) as totalAmount FROM leads ${where}`,
       params
     );
+    
+    // Get leads without tasks count
+    const leadsWithoutTasksRow = await pool.query(
+      `SELECT COUNT(*) as count FROM leads l 
+       LEFT JOIN tasks t ON l.id = t.lead_id 
+       ${where} AND t.lead_id IS NULL`,
+      params
+    );
+    
+    // Get total tasks count
+    const totalTasksRow = await pool.query(
+      `SELECT COUNT(*) as count FROM tasks t 
+       LEFT JOIN leads l ON t.lead_id = l.id 
+       WHERE l.assigned_to = $1`,
+      params
+    );
+    
     res.json({
       stageStats: stats.rows,
       statusStats: statusStats.rows,
-      totalLeads: totalLeadsRow.rows[0].totalLeads,
-      totalAmount: totalAmountRow.rows[0].totalAmount || 0
+      totalLeads: parseInt(totalLeadsRow.rows[0].totalLeads),
+      totalAmount: parseFloat(totalAmountRow.rows[0].totalAmount) || 0,
+      leadsWithoutTasks: parseInt(leadsWithoutTasksRow.rows[0].count),
+      totalTasks: parseInt(totalTasksRow.rows[0].count)
     });
   } catch (error) {
     console.error('Get stats error:', error);
@@ -638,4 +678,4 @@ router.get('/emails/public', async (req, res) => {
   }
 });
 
-export default router; 
+export default router;
